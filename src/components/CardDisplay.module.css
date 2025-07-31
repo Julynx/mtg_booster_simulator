@@ -1,0 +1,117 @@
+.cardGrid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-rows: repeat(2, auto);
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+  overflow-x: auto; 
+  overflow-y: hidden;
+  padding: 1rem;
+  padding-bottom: 1.5rem; /* Extra space for scrollbar */
+  height: 32rem; /* Optimized for two rows within viewport */
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (min-width: 768px) {
+  .cardGrid {
+    height: 36rem; /* Larger height for desktop with bigger cards */
+  }
+}
+
+.cardGrid::-webkit-scrollbar {
+  height: 12px;
+}
+
+.cardGrid::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+}
+
+.cardGrid::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
+}
+
+.cardContainer {
+  position: relative;
+  cursor: pointer;
+}
+
+.cardWrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.card {
+  position: relative;
+  width: 10rem;
+  height: 14rem;
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+  transform-style: preserve-3d;
+}
+
+@media (min-width: 768px) {
+  .card {
+    width: 12rem;
+    height: 16.5rem;
+  }
+}
+
+.cardBack {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: linear-gradient(to bottom right, #991b1b, #b91c1c);
+  border-radius: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backface-visibility: hidden;
+}
+
+.cardBackContent {
+  color: white;
+  text-align: center;
+}
+
+.cardBackText {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 700;
+}
+
+.cardFront {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  transform: rotateY(180deg);
+  backface-visibility: hidden;
+}
+
+.cardImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.rarityAura {
+  position: absolute;
+  top: 1rem;
+  left: 0.75rem;
+  right: 0.75rem;
+  bottom: 1rem;
+  border-radius: 0;
+  filter: blur(0.5rem);
+  z-index: -1;
+  opacity: 1;
+}

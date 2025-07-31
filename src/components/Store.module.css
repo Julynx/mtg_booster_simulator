@@ -1,0 +1,353 @@
+.storeButtonContainer {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+}
+
+.storeButton {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+.storeButton:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.moneyDisplay {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #ff6b6b;
+  border-radius: 12px;
+  padding: 2px 6px;
+  font-size: 12px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.modalContent {
+  background: linear-gradient(135deg, #2c3e50 0%, #1a1a2e 100%);
+  border-radius: 15px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modalTitle {
+  color: white;
+  font-size: 24px;
+  font-weight: bold;
+  margin: 0;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  color: #ccc;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.closeButton:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.storeContent {
+  padding: 20px;
+}
+
+.moneySection {
+  text-align: center;
+  margin-bottom: 30px;
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.moneyInfo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.moneyAmount {
+  font-size: 28px;
+  font-weight: bold;
+  color: #4ade80;
+}
+
+.moneyNote {
+  color: #999;
+  font-size: 14px;
+  margin: 0;
+}
+
+.freePackTimer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+  color: #ccc;
+  font-size: 14px;
+}
+
+.freePackText {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.claimButton {
+  background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+  border: none;
+  border-radius: 15px;
+  color: white;
+  padding: 4px 12px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-left: 8px;
+}
+
+.claimButton:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(74, 222, 128, 0.4);
+}
+
+
+.buySection {
+  margin-bottom: 30px;
+}
+
+.buySection h3 {
+  color: white;
+  font-size: 20px;
+  margin-bottom: 15px;
+}
+
+.packOptions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 15px;
+}
+
+.packOption {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  padding: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.packOption.selected {
+  border-color: #667eea;
+  background: rgba(102, 126, 234, 0.1);
+}
+
+.packOption.cannotAfford {
+  opacity: 0.5;
+}
+
+.packInfo h4 {
+  color: white;
+  margin: 0 0 5px 0;
+  font-size: 16px;
+}
+
+.packPrice {
+  color: #4ade80;
+  font-weight: bold;
+  margin: 0;
+}
+
+.buyButton {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 20px;
+  color: white;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.buyButton:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.buyButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sellSection {
+  margin-bottom: 20px;
+}
+
+.sellSection h3 {
+  color: white;
+  font-size: 20px;
+  margin-bottom: 15px;
+}
+
+.sellHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.sellActions {
+  display: flex;
+  gap: 10px;
+}
+
+.sellToggleButton,
+.sellConfirmButton,
+.sellCancelButton {
+  background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+  border: none;
+  border-radius: 20px;
+  color: white;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+.sellCancelButton {
+  background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+}
+
+.sellToggleButton:hover:not(:disabled),
+.sellConfirmButton:hover:not(:disabled),
+.sellCancelButton:hover {
+  transform: scale(1.05);
+}
+
+.sellToggleButton:disabled,
+.sellConfirmButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sellInstructions {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 15px;
+}
+
+.sellInstructions p {
+  color: #ccc;
+  font-size: 14px;
+  margin: 5px 0;
+  text-align: center;
+}
+
+.collectionPreview {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.cardPreview {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 2px solid transparent;
+}
+
+.cardPreview:hover {
+  transform: scale(1.05);
+}
+
+.cardPreview.selected {
+  border-color: #ff0000 !important;
+  box-shadow: 0 0 10px rgba(255, 0, 0, 0.5);
+}
+
+.cardImage {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 6px;
+}
+
+.cardValue {
+  position: absolute;
+  bottom: 2px;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.7);
+  color: #4ade80;
+  font-size: 12px;
+  font-weight: bold;
+  text-align: center;
+  padding: 4px;
+}
+
+.emptyCollection {
+  text-align: center;
+  color: #999;
+  font-style: italic;
+  margin: 20px 0;
+}
