@@ -112,7 +112,7 @@ const Store = ({ money, setMoney, collection, setCollection, openPack, packs, cu
             onClick={(e) => e.stopPropagation()}
           >
             <div className={styles.modalHeader}>
-              <h2 className={styles.modalTitle}>Magic Card Store</h2>
+              <h2 className={styles.modalTitle}>MTG Booster Pack Store</h2>
               <button
                 className={styles.closeButton}
                 onClick={() => setShowStore(false)}
@@ -132,7 +132,7 @@ const Store = ({ money, setMoney, collection, setCollection, openPack, packs, cu
                   <span className={styles.freePackText}>
                     {nextFreePackTime && new Date() < nextFreePackTime ? (
                       <>
-                        Next pack in <CountdownTimer targetTime={nextFreePackTime} />
+                        Next free pack in <CountdownTimer targetTime={nextFreePackTime} />
                       </>
                     ) : (
                       'A free pack has been added to your inventory!'

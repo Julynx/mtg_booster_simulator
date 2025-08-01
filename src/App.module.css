@@ -71,3 +71,23 @@
   align-items: center;
   gap: 2px;
 }
+
+/* Legal disclaimer at bottom of main screen */
+.legalDisclaimer {
+  position: absolute; /* Take it out of normal flow so it doesn't affect layout */
+  bottom: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 80vw;
+  padding: 0; /* no padding to avoid shifting content */
+  text-align: center;
+  color: rgba(255,255,255,0.3);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  z-index: 10;
+  pointer-events: none; /* ensure it doesn't block clicks */
+}
+
+.legalDisclaimer p {
+  margin: 0.25rem 0;
+}

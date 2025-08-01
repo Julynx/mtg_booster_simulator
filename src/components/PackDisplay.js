@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useEffect, useMemo } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { DollarSign, Gift, ShoppingCart } from 'lucide-react';
 import styles from './PackDisplay.module.css';
@@ -188,8 +188,8 @@ const PackDisplay = ({
           <motion.div className={`${styles.pack} bg-gradient-to-br from-gray-600 to-gray-800 ${styles.packNoPacksBorder}`}>
             <div className={styles.label}>
               <ShoppingCart size={48} style={{ marginBottom: '0.5rem' }} />
-              <span className={styles.packName}>No Packs Left</span>
-              <span className={styles.cardCount}>Visit Store to Buy More</span>
+              <span className={styles.packName}>You have no packs</span>
+              <span className={styles.cardCount}>Click to visit the Store</span>
             </div>
           </motion.div>
         </motion.div>
@@ -319,7 +319,7 @@ const PackDisplay = ({
                   {/* Pack info below image */}
                   <div className={styles.packInfoContainer}>
                     <span className={styles.packName}>{config.name}</span>
-                    <span className={styles.cardCount}>{count} packs available</span>
+                    <span className={styles.cardCount}>{count} packs owned</span>
                   </div>
 
                   {/* Sparkle effects */}

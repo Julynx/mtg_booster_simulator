@@ -256,9 +256,51 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
           <motion.div className={styles.modalOverlay} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <motion.div className={styles.modalContent} ref={modalContentRef} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }}>
               <div className={styles.modalHeader}>
-                <h2 className={styles.modalTitle}>Your Collection ({processedCards.length} cards)</h2>
+                <h2 className={styles.modalTitle}>
+                  Your Collection ({processedCards.length} cards)
+                  <span className={styles.totalValue}>
+                    {(() => {
+                      // Sum total value including duplicates
+                      const total = groupedCardsArray.reduce((sum, cg) => {
+                        const price = typeof cg.price === 'number' ? cg.price : 0;
+                        const count = typeof cg.count === 'number' ? cg.count : 0;
+                        return sum + price * count;
+                      }, 0);
+                      return ` • Total Value: $${total.toFixed(2)}`;
+                    })()}
+                  </span>
+                </h2>
                 <div className={styles.headerActions}>
-                  <button className={styles.filterButton} onClick={() => setShowFilters(!showFilters)}><Filter size={16} /></button>
+                  <button
+                    className={styles.filterButton}
+                    onClick={() => setShowFilters(!showFilters)}
+                    title="Filters"
+                  >
+                    <Filter size={16} />
+                  </button>
+                  {/* Reset (Start Over) two-step control */}
+                  <button
+                    className={styles.resetButton}
+                    onClick={() => {
+                      // Step 1: confirmation
+                      const confirm1 = window.confirm('This will delete all local data (collection, inventory, money, timers). Continue?');
+                      if (!confirm1) return;
+                      const confirm2 = window.confirm('Are you absolutely sure? This action cannot be undone.');
+                      if (!confirm2) return;
+                      try {
+                        // Clear all site data for this origin
+                        localStorage.clear();
+                      } catch (e) {
+                        console.warn('Failed clearing localStorage:', e);
+                      } finally {
+                        // Full reload to reinitialize app state
+                        window.location.reload();
+                      }
+                    }}
+                    title="Delete all data and start over"
+                  >
+                    Reset
+                  </button>
                   <button className={styles.closeButton} onClick={closeCollection}>✕</button>
                 </div>
               </div>

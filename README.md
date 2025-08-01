@@ -119,6 +119,29 @@ The `utils.js` file provides:
    npm run build
    ```
 
+## Deployment (GitHub Pages via Actions)
+
+This project includes a minimal GitHub Actions workflow to build and deploy to GitHub Pages on pushes to the default branch.
+
+1) Repository settings
+- Enable GitHub Pages:
+  - Settings → Pages → Build and deployment → Source: “GitHub Actions”.
+- Ensure you have permissions to deploy (default is fine on public repos).
+
+2) Branch protection
+- If your default branch is “main”, the workflow is configured to trigger on pushes to main.
+
+3) Environment variables
+- No runtime secrets are required for this app. An `.env.example` is provided for future environment variables. Create a `.env` locally if needed; React will automatically inline variables prefixed with `REACT_APP_` at build time.
+
+4) Workflow summary
+- On push to main:
+  - Setup Node, install deps, run build
+  - Upload build as artifact
+  - Deploy to GitHub Pages with official actions
+- After it completes, your site will be available at:
+  - https://YOUR_GITHUB_USERNAME.github.io/YOUR_REPO_NAME/
+
 ## Dependencies
 
 - React 18+

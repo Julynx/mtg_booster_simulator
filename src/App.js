@@ -585,6 +585,11 @@ const AppContent = () => {
         setCollection={setCollection}
         setMoney={setMoney}
       />
+
+      {/* Legal disclaimer at bottom of main screen */}
+      <footer className={styles.legalDisclaimer}>
+        <p>All currency used within this simulation is entirely fictional and holds no real-world monetary value. All products presented are simulated and do not represent or replicate real-world goods. All referenced items, including card designs, names, and intellectual property, are the copyrighted property of Wizards of the Coast and Hasbro. This simulation is a fan-created experience and is not affiliated with, endorsed by, or associated with Wizards of the Coast or Hasbro.</p>
+      </footer>
     </div>
   );
 };

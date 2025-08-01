@@ -84,6 +84,8 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 1rem;
+  margin-left: 0.5rem;
+  margin-right: 0.5rem;
 }
 
 .modalTitle {
@@ -418,10 +420,28 @@
   background: linear-gradient(to right, violet, indigo, blue, green, yellow, orange, red);
   color: white;
   font-weight: 600;
+  font-size: 0.9rem;
   padding: 4px 12px;
   border-radius: 20px;
   text-transform: uppercase;
   white-space: nowrap; /* Prevent text from wrapping */
+}
+
+/* Reset button styled to match filter button dimensions but with red emphasis */
+.resetButton {
+  background: #b91c1c; /* red-700 */
+  color: white;
+  border: none;
+  border-radius: 0.375rem; /* same rounded corners as filterButton */
+  padding: 0.5rem; /* same height/padding as filterButton */
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.resetButton:hover {
+  background: #991b1b; /* red-800 on hover */
 }
 
 @media (max-width: 768px) {
@@ -429,7 +449,7 @@
     grid-template-columns: repeat(2, 1fr);
     gap: 1rem;
   }
-  
+
   .cardImage {
     width: 120px;
     height: 168px;

@@ -63,30 +63,57 @@ export const fetchCardsBySet = async (setCode, count = 15) => {
  */
 export const fetchBoosterPack = async (setCode, slots = null) => {
   // Helper to fetch a raw card with specific constraints; returns raw Scryfall card
-  const fetchRawCard = async ({ rarity = null, queryFoil = null, pool = null, type = null }) => {
+  const fetchRawCard = async ({ rarity = null, queryFoil = undefined, pool = null, type = null }) => {
     let query = `set:${setCode}`;
     if (rarity) query += ` rarity:${rarity}`;
     if (type) query += ` type:${type}`;
     if (pool === 'land') {
-      // Land pool: caller will set rarity/type as needed; keep here as generic
       query += ` t:land`;
     }
+    // Only constrain foil if explicitly requested
     if (queryFoil === true) query += ` is:foil`;
     if (queryFoil === false) query += ` is:nonfoil`;
+
+    // LOG the composed query for debugging foil issues
+    console.log('[mtg-api] fetchRawCard query:', {
+      setCode,
+      rarity,
+      type,
+      pool,
+      queryFoil,
+      finalQuery: query
+    });
 
     try {
       const response = await fetch(`https://api.scryfall.com/cards/random?q=${encodeURIComponent(query)}`);
       const card = await response.json();
+      console.log('[mtg-api] fetchRawCard response:', {
+        ok: !!card && card.object !== 'error',
+        finishes: card?.finishes,
+        foilField: card?.foil,
+        nonfoilField: card?.nonfoil,
+        rarity: card?.rarity,
+        name: card?.name,
+        id: card?.id
+      });
       if (card && card.object !== 'error') {
         return card;
       }
     } catch (error) {
       console.warn(`Failed to fetch raw card with query "${query}":`, error);
     }
-    // Fallback to generic random card if specific fetch fails
     try {
       const randomCardResponse = await fetch('https://api.scryfall.com/cards/random');
       const randomCard = await randomCardResponse.json();
+      console.log('[mtg-api] fetchRawCard fallback /cards/random response:', {
+        ok: !!randomCard && randomCard.object !== 'error',
+        finishes: randomCard?.finishes,
+        foilField: randomCard?.foil,
+        nonfoilField: randomCard?.nonfoil,
+        rarity: randomCard?.rarity,
+        name: randomCard?.name,
+        id: randomCard?.id
+      });
       if (randomCard && randomCard.object !== 'error') {
         return randomCard;
       }
@@ -101,85 +128,85 @@ export const fetchBoosterPack = async (setCode, slots = null) => {
   // If slots provided, honor them; otherwise fall back to legacy 14-card logic
   if (Array.isArray(slots) && slots.length > 0) {
     const formatted = [];
+    console.log('[mtg-api] fetchBoosterPack per-slot mode enabled. slots:', slots);
 
-    // Per-slot processing
     for (const slot of slots) {
       const count = typeof slot.count === 'function' ? Number(slot.count({})) : Number(slot.count || 0);
       for (let i = 0; i < count; i++) {
-        // Resolve slot parameters
         let resolved = null;
         if (typeof slot.resolver === 'function') {
-          try {
-            resolved = slot.resolver({});
-          } catch (e) {
-            console.warn('Slot resolver error:', e);
-          }
+          try { resolved = slot.resolver({}); } catch (e) { console.warn('Slot resolver error:', e); }
         }
 
-        // Determine rarity via odds if provided
         let rarity = resolved?.rarity || null;
         if (!rarity && slot.odds && typeof slot.odds === 'object') {
           const entries = Object.entries(slot.odds);
           let r = Math.random();
           for (const [rar, weight] of entries) {
             r -= Number(weight) || 0;
-            if (r <= 0) {
-              rarity = rar;
-              break;
-            }
+            if (r <= 0) { rarity = rar; break; }
           }
-          if (!rarity && entries.length > 0) {
-            rarity = entries[entries.length - 1][0];
-          }
+          if (!rarity && entries.length > 0) rarity = entries[entries.length - 1][0];
         }
-        // Fallback rarity based on pool
         if (!rarity && slot.pool && ['common','uncommon','rare','mythic'].includes(slot.pool)) {
           rarity = slot.pool;
         }
 
-        // Determine foil flag
-        const foil = typeof slot.foil === 'boolean' ? slot.foil : (resolved?.foil ?? null);
+        // Only set foil if slot explicitly defines it (boolean) or resolver returned it (boolean).
+        // Otherwise, leave undefined so API does not force foil/nonfoil.
+        const hasExplicitFoil = typeof slot.foil === 'boolean' || typeof resolved?.foil === 'boolean';
+        const foilFlag = typeof resolved?.foil === 'boolean' ? resolved.foil :
+                         typeof slot.foil === 'boolean' ? slot.foil : undefined;
 
-        // Determine type/pool-specific behavior
-        let type = null;
         if (slot.pool === 'land' || resolved?.pool === 'land') {
-          // Implement: 95% basic land from set, 5% non-basic land from set
+          console.log('[mtg-api] slot land:', { resolved, slot, foilFlag, rarity });
           const pickBasic = Math.random() < 0.95;
           if (pickBasic) {
-            // Basic lands are type:basic land; try within set
-            const raw = await fetchRawCard({ rarity: null, queryFoil: foil, pool: 'land', type: 'basic' });
-            pushIfCard(formatted, raw, foil);
+            const raw = await fetchRawCard({ rarity: null, queryFoil: foilFlag, pool: 'land', type: 'basic' });
+            pushIfCard(formatted, raw, hasExplicitFoil ? foilFlag : null);
           } else {
-            // Non-basic land in set: t:land -t:basic
             let query = `set:${setCode} t:land -t:basic`;
-            if (foil === true) query += ' is:foil';
-            if (foil === false) query += ' is:nonfoil';
+            if (foilFlag === true) query += ' is:foil';
+            if (foilFlag === false) query += ' is:nonfoil';
+            console.log('[mtg-api] land non-basic query:', { finalQuery: query, foilFlag });
             try {
               const response = await fetch(`https://api.scryfall.com/cards/random?q=${encodeURIComponent(query)}`);
               const card = await response.json();
+              console.log('[mtg-api] land non-basic response:', {
+                ok: !!card && card.object !== 'error',
+                finishes: card?.finishes,
+                foilField: card?.foil,
+                nonfoilField: card?.nonfoil,
+                name: card?.name,
+                id: card?.id
+              });
               if (card && card.object !== 'error') {
-                pushIfCard(formatted, card, foil);
+                pushIfCard(formatted, card, hasExplicitFoil ? foilFlag : null);
               } else {
-                // fallback to any land
-                const fallback = await fetchRawCard({ rarity: null, queryFoil: foil, pool: 'land' });
-                pushIfCard(formatted, fallback, foil);
+                const fallback = await fetchRawCard({ rarity: null, queryFoil: foilFlag, pool: 'land' });
+                pushIfCard(formatted, fallback, hasExplicitFoil ? foilFlag : null);
               }
-            } catch {
-              const fallback = await fetchRawCard({ rarity: null, queryFoil: foil, pool: 'land' });
-              pushIfCard(formatted, fallback, foil);
+            } catch (e) {
+              console.warn('[mtg-api] land non-basic error:', e);
+              const fallback = await fetchRawCard({ rarity: null, queryFoil: foilFlag, pool: 'land' });
+              pushIfCard(formatted, fallback, hasExplicitFoil ? foilFlag : null);
             }
           }
-          continue; // land slot handled
+          continue;
         }
 
-        // Wildcard or generic pool: use rarity if resolved/odds selected, otherwise any
+        console.log('[mtg-api] slot generic/wildcard request:', {
+          rarity,
+          pool: slot.pool || resolved?.pool || null,
+          foilFlag
+        });
         const raw = await fetchRawCard({
           rarity: rarity || null,
-          queryFoil: foil,
+          queryFoil: foilFlag,
           pool: slot.pool || resolved?.pool || null,
-          type
+          type: null
         });
-        pushIfCard(formatted, raw, foil);
+        pushIfCard(formatted, raw, hasExplicitFoil ? foilFlag : null);
       }
     }
 
@@ -189,6 +216,7 @@ export const fetchBoosterPack = async (setCode, slots = null) => {
   // Legacy fallback: 14-card construction similar to previous behavior
   const rawCards = [];
   const foilStatuses = [];
+  console.log('[mtg-api] fetchBoosterPack legacy mode (no slots). set:', setCode);
 
   // 7 Common cards
   for (let i = 0; i < 7; i++) {
@@ -210,14 +238,24 @@ export const fetchBoosterPack = async (setCode, slots = null) => {
   // Land slot: 95% basic in-set, 5% non-basic in-set
   const pickBasic = Math.random() < 0.95;
   if (pickBasic) {
+    console.log('[mtg-api] legacy land slot: basic');
     rawCards.push(await fetchRawCard({ rarity: null, queryFoil: null, pool: 'land', type: 'basic' }));
     foilStatuses.push(false);
   } else {
     // non-basic land in set
     try {
       const query = `set:${setCode} t:land -t:basic`;
+      console.log('[mtg-api] legacy land slot non-basic query:', query);
       const response = await fetch(`https://api.scryfall.com/cards/random?q=${encodeURIComponent(query)}`);
       const card = await response.json();
+      console.log('[mtg-api] legacy land slot non-basic response:', {
+        ok: !!card && card.object !== 'error',
+        finishes: card?.finishes,
+        foilField: card?.foil,
+        nonfoilField: card?.nonfoil,
+        name: card?.name,
+        id: card?.id
+      });
       if (card && card.object !== 'error') {
         rawCards.push(card);
         foilStatuses.push(false);
@@ -226,7 +264,8 @@ export const fetchBoosterPack = async (setCode, slots = null) => {
         rawCards.push(fallback);
         foilStatuses.push(false);
       }
-    } catch {
+    } catch (e) {
+      console.warn('[mtg-api] legacy land slot non-basic error:', e);
       const fallback = await fetchRawCard({ rarity: null, queryFoil: false, pool: 'land' });
       rawCards.push(fallback);
       foilStatuses.push(false);
@@ -237,9 +276,13 @@ export const fetchBoosterPack = async (setCode, slots = null) => {
   rawCards.push(await fetchRawCard({ rarity: null, queryFoil: false }));
   foilStatuses.push(false);
 
-  // 1 Foil wildcard (any rarity)
-  rawCards.push(await fetchRawCard({ rarity: null, queryFoil: true }));
-  foilStatuses.push(true);
+  // 1 Foil wildcard (any rarity) - explicitly request foil
+  {
+    console.log('[mtg-api] legacy foil wildcard slot: explicit foil');
+    const raw = await fetchRawCard({ rarity: null, queryFoil: true });
+    rawCards.push(raw);
+    foilStatuses.push(true);
+  }
 
   // Format and pad/trim to 14
   let finalFormattedCards = [];
@@ -366,7 +409,9 @@ const formatCardData = (card, explicitFoil = null) => {
     set: card.set_name || 'Unknown Set',
     setCode: card.set || 'Unknown', // Add setCode to formatted card data
     collectorNumber: card.collector_number || '',
-    foil: explicitFoil !== null ? explicitFoil : (card.foil || false)
+    // Only treat as foil when caller explicitly marks it as foil.
+    // Do NOT infer foil from Scryfall's card.foil, which only indicates availability.
+    foil: explicitFoil === true ? true : false
   };
 };
 

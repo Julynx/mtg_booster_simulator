@@ -278,6 +278,7 @@ const CardDisplay = ({ cards, flippedCards, flipCard, getAuraColor, animatingOut
                     padding: '4px 12px',
                     borderRadius: '20px',
                     textTransform: 'uppercase',
+                    fontSize: '0.9rem',
                     whiteSpace: 'nowrap'
                   }}>FOIL</span>}
                   <span style={{
