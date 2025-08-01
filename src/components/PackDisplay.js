@@ -97,10 +97,6 @@ const CountdownTimer = ({ targetTime }) => {
  * @param {Function} props.onOpenStore - Function to open the store
  * @param {Date} props.nextFreePackTime - Time when next free pack is available
  * @param {Function} props.claimFreePack - Function to claim free pack
- * @param {boolean} props.isShaking - Explicit flag to indicate shake phase
- * @param {string|null} props.openingPackType - Which pack is opening
- * @param {boolean} props.exploding - Explode animation flag
- * @param {Function} props.onExplosionComplete - Callback when explode finishes
  * @returns {JSX.Element} The rendered pack display component
  */
 const PackDisplay = ({
@@ -110,11 +106,7 @@ const PackDisplay = ({
   packInventory,
   onOpenStore,
   nextFreePackTime,
-  claimFreePack,
-  isShaking,
-  openingPackType,
-  exploding,
-  onExplosionComplete
+  claimFreePack
 }) => {
   const totalPacks = Object.values(packInventory).reduce((sum, count) => sum + count, 0);
 
@@ -131,11 +123,6 @@ const PackDisplay = ({
   const availablePackType = getFirstAvailablePack();
   const packConfig = packs[availablePackType];
 
-  // Only the clicked/active pack should palpitate/shake.
-  // Derive a local boolean so we do not accidentally animate all packs.
-  const isAnyPackShaking = !!isShaking;
-  // Guard: never trigger explode before a visible shake phase by defaulting to shake when both flags false but opening
-
   const handleStoreClick = useCallback(() => {
     onOpenStore();
   }, [onOpenStore]);
@@ -147,37 +134,6 @@ const PackDisplay = ({
     initial: { opacity: 0, scale: 0 },
     animate: { opacity: 1, scale: 1 },
     transition: { duration: 0.6, type: 'spring', bounce: 0.4 }
-  };
-
-  // Variants: idle, shake, explode
-  const packVariants = {
-    idle: { opacity: 1, scale: 1, rotate: 0, x: 0, y: 0 },
-    // Simplify shake to keyframes on the container to avoid variant override issues
-    shake: {
-      x: [0, -10, 10, -10, 10, 0],
-      y: [0, -6, 6, -6, 6, 0],
-      rotate: [0, -3, 3, -3, 3, 0],
-      transition: {
-        duration: 0.4,
-        repeat: Infinity,
-        repeatType: 'loop',
-        ease: 'easeInOut'
-      }
-    },
-    explode: {
-      scale: [1, 1.15, 0.95, 1.8, 0.5],
-      rotate: [0, 12, -12, 540, 540],
-      opacity: [1, 1, 1, 0.7, 0],
-      y: [0, -10, 8, -160, -200],
-      filter: [
-        'drop-shadow(0 0 0px rgba(255,255,255,0))',
-        'drop-shadow(0 0 18px rgba(255,255,255,0.9))',
-        'drop-shadow(0 0 28px rgba(255,255,255,1))',
-        'drop-shadow(0 0 10px rgba(255,255,255,0.6))',
-        'drop-shadow(0 0 0px rgba(255,255,255,0))'
-      ],
-      transition: { duration: 0.9, ease: 'easeIn' }
-    }
   };
 
   // If no packs available, show store link
@@ -244,11 +200,6 @@ const PackDisplay = ({
         {Object.entries(packInventory).map(([packType, count]) => {
           if (count <= 0) return null;
           const config = packs[packType];
-          const isTarget = openingPackType === packType;
-
-          // Only allow shake for the target pack, and only before explode starts.
-          // Additionally, if this is the target and NOT exploding yet, force shake when parent indicates opening (isShaking can be false briefly).
-          const shouldShake = isTarget && (!exploding) && (isAnyPackShaking || Boolean(openingPackType));
 
           return (
             <motion.div
@@ -263,26 +214,19 @@ const PackDisplay = ({
                   className={styles.pack}
                   style={{ transformOrigin: '50% 50%' }}
                   initial={false}
-                  variants={packVariants}
-                  // Drive variant exclusively from state; no extra transitions that might cancel keyframes
-                  animate={isTarget ? (exploding ? 'explode' : shouldShake ? 'shake' : 'idle') : 'idle'}
+                  animate="idle" // Always idle, no more shake/explode
                   transition={undefined}
-                  onAnimationComplete={(variant) => {
-                    if (variant === 'explode' && isTarget && exploding && onExplosionComplete) {
-                      onExplosionComplete();
-                    }
-                  }}
                 >
                   {/* Shine Overlay */}
                   <motion.div
                     className={styles.shine}
                     initial={{ x: '-120%' }}
-                    animate={{ x: exploding && isTarget ? '140%' : '120%' }}
+                    animate={{ x: '120%' }} // Simplified shine animation
                     transition={{
-                      duration: shouldShake ? 0.7 : 1.3,
+                      duration: 1.3,
                       repeat: Infinity,
                       ease: 'linear',
-                      repeatDelay: shouldShake ? 0.15 : 0.9
+                      repeatDelay: 0.9
                     }}
                     style={{
                       maskImage: `url(${packConfig.image})`,
@@ -298,22 +242,15 @@ const PackDisplay = ({
                     alt={config.name}
                     className={styles.packImage}
                     animate={{
-                      filter: shouldShake
-                        ? [
-                            'drop-shadow(0 0 0px rgba(147, 51, 234, 0))',
-                            'drop-shadow(0 0 12px rgba(255, 255, 255, 0.7))',
-                            'drop-shadow(0 0 12px rgba(255, 255, 255, 0.7))',
-                            'drop-shadow(0 0 0px rgba(147, 51, 234, 0))'
-                          ]
-                        : [
+                      filter: [
                             'drop-shadow(0 0 0px rgba(147, 51, 234, 0))',
                             'drop-shadow(0 0 8px rgba(255, 255, 255, 0.5))',
                             'drop-shadow(0 0 8px rgba(255, 255, 255, 0.5))',
                             'drop-shadow(0 0 0px rgba(147, 51, 234, 0))'
                           ],
-                      scale: shouldShake ? [1, 1.012, 0.988, 1.012, 1] : 1
+                      scale: 1
                     }}
-                    transition={shouldShake ? { duration: 0.6, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.8, ease: 'easeInOut' }}
+                    transition={{ duration: 0.8, ease: 'easeInOut' }}
                   />
 
                   {/* Pack info below image */}

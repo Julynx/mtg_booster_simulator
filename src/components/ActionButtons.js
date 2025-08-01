@@ -14,7 +14,7 @@ import styles from './ActionButtons.module.css';
  * @returns {JSX.Element} The rendered action buttons component
  */
 const ActionButtons = ({ flippedCards, cards, onAction, allCardsFlipped }) => {
-  const buttonText = allCardsFlipped ? 'Continue' : 'Reveal All Cards';
+  const buttonText = allCardsFlipped ? 'Continue' : 'Reveal All';
   const actionType = allCardsFlipped ? 'collect' : 'reveal';
 
   const handleButtonClick = useCallback(() => {
@@ -42,7 +42,6 @@ const ActionButtons = ({ flippedCards, cards, onAction, allCardsFlipped }) => {
         {...buttonAnimation}
         onClick={handleButtonClick}
       >
-        <Trophy className={styles.icon} size={20} />
         {buttonText}
       </motion.button>
     </motion.div>

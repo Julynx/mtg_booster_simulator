@@ -8,8 +8,9 @@ import ActionButtons from './components/ActionButtons';
 import Collection from './components/Collection';
 import BackgroundParticles from './components/BackgroundParticles';
 import Store from './components/Store';
+import PackOpeningScreen from './components/PackOpeningScreen'; // Import PackOpeningScreen
 import { NotificationProvider, useNotification } from './components/NotificationProvider';
-import { getRarityColor, getAuraColor, generateCards, loadBoosters } from './utils';
+import { getRarityColor, getAuraColor, loadBoosters } from './utils';
 import { fetchBoosterPack } from './mtg-api';
 import { APP_CONFIG } from './config';
 import styles from './App.module.css';
@@ -22,13 +23,12 @@ const AppContent = () => {
   const { addNotification } = useNotification();
   const [packs, setPacks] = useState({}); // State to store loaded booster packs
   const [currentPack, setCurrentPack] = useState(null); // Default to null, will be set after loading
-  const [isOpening, setIsOpening] = useState(false);
-  const [isLoadingCards, setIsLoadingCards] = useState(false); // API in-flight
-  const [readyToReveal, setReadyToReveal] = useState(false); // Cards data is ready to reveal
-  const [exploding, setExploding] = useState(false); // Pack exit animation flag
-  const [openingPackType, setOpeningPackType] = useState(null); // Which pack is currently opening (for targeted shake)
-  const [minShakeDone, setMinShakeDone] = useState(false); // ensure a minimum shake duration before explosion
-  const [shakeStartAt, setShakeStartAt] = useState(null); // precise shake start timestamp
+  // Simplified animation states
+  const [isOpening, setIsOpening] = useState(false); // Whether we're in the opening sequence
+  const [openingPackType, setOpeningPackType] = useState(null); // Which pack is currently opening
+  const [animationPhase, setAnimationPhase] = useState('idle'); // 'idle', 'shaking', 'exploding', 'cards'
+  const [isLoading, setIsLoading] = useState(false); // New state for global loading overlay
+  const [triggerPackExplosion, setTriggerPackExplosion] = useState(false); // New state to trigger explosion
   const [cards, setCards] = useState([]);
   const [flippedCards, setFlippedCards] = useState(new Set());
   const [animatingOutCards, setAnimatingOutCards] = useState(false);
@@ -251,10 +251,11 @@ const AppContent = () => {
 
   /**
    * Opens a new booster pack with real MTG cards.
-   * Sequence:
-   * - Click -> start shaking immediately
-   * - Enforce minimum shake window (>= 900ms) even if API is instant
-   * - When both min window elapsed AND data ready, explode
+   * Simplified animation sequence:
+   * 1. Start shaking
+   * 2. Load cards
+   * 3. Explode
+   * 4. Show cards
    */
   const openPack = useCallback(async (packType = currentPack) => {
     // Check if we have packs available
@@ -267,14 +268,11 @@ const AppContent = () => {
       return;
     }
 
+    setIsLoading(true); // Start loading
+    // Start opening sequence
     setIsOpening(true);
-    setOpeningPackType(packType); // track which pack is opening
-    setExploding(false); // reset explosion state
-    setReadyToReveal(false); // We are not ready to reveal yet
-    setMinShakeDone(false); // reset min shake flag
-    setShakeStartAt(Date.now()); // mark shake start for enforcing minimum duration
-    setIsLoadingCards(true); // Set loading to true when starting to open (triggers shake) - keep after timestamps
-    setCards([]); // Reset cards to ensure PackDisplay renders during loading
+    setOpeningPackType(packType);
+    setCards([]);
     setFlippedCards(new Set());
     
     // Use the pack from inventory
@@ -285,93 +283,61 @@ const AppContent = () => {
     
     try {
       console.log('Opening pack for set:', packType);
-      const packConfig = packs[packType]; // Use dynamically loaded packs
-      console.log('Pack config:', packConfig);
+      const packConfig = packs[packType];
       
-      console.log('Fetching booster pack for set code:', packConfig.setCode);
-
-      // Use per-slot fetching when slots exist; otherwise legacy fallback
-      let realCards = [];
+      // Fetch cards
+      let fetchedCards;
       if (Array.isArray(packConfig.slots) && packConfig.slots.length > 0) {
-        realCards = await fetchBoosterPack(packConfig.setCode, packConfig.slots);
+        fetchedCards = await fetchBoosterPack(packConfig.setCode, packConfig.slots);
       } else {
-        realCards = await fetchBoosterPack(packConfig.setCode);
+        fetchedCards = await fetchBoosterPack(packConfig.setCode);
       }
-
-      console.log('Received real cards:', realCards);
       
-      if (realCards && realCards.length > 0) {
-        console.log('Setting real cards:', realCards.length);
-        // Validate that we have real card data
-        const validRealCards = realCards.filter(card => 
-          card && card.name && card.image
-        );
-        
-        if (validRealCards.length > 0) {
-          console.log('Valid real cards count:', validRealCards.length);
-          // Prepare cards but do not reveal yet
-          setCollection(prev => {
-            const remainingSpace = APP_CONFIG.maxCollectionSize - prev.length;
-            const toAdd = remainingSpace >= validRealCards.length ? validRealCards : validRealCards.slice(0, Math.max(0, remainingSpace));
-            return remainingSpace > 0 ? [...prev, ...toAdd] : prev;
-          });
-          setPendingOpenedIds(validRealCards.map(c => c.id));
-          setCards(validRealCards);
-        } else {
-          console.warn('No valid real cards found, using generated cards as fallback');
-          const gen = generateCards();
-          setCollection(prev => {
-            const remainingSpace = APP_CONFIG.maxCollectionSize - prev.length;
-            const toAdd = remainingSpace >= gen.length ? gen : gen.slice(0, Math.max(0, remainingSpace));
-            return remainingSpace > 0 ? [...prev, ...toAdd] : prev;
-          });
-          setPendingOpenedIds(gen.map(c => c.id));
-          setCards(gen);
-        }
-      } else {
-        // Fallback to generated cards if API fails
-        console.warn('Failed to fetch real cards, using generated cards as fallback');
-        const gen = generateCards();
-        setCollection(prev => {
-          const remainingSpace = APP_CONFIG.maxCollectionSize - prev.length;
-          const toAdd = remainingSpace >= gen.length ? gen : gen.slice(0, Math.max(0, remainingSpace));
-          return remainingSpace > 0 ? [...prev, ...toAdd] : prev;
-        });
-        setPendingOpenedIds(gen.map(c => c.id));
-        setCards(gen);
+      // Process cards - fail loudly if no valid cards
+      if (!fetchedCards || fetchedCards.length === 0) {
+        throw new Error('No cards returned from API');
       }
-    } catch (error) {
-      console.error('Error opening pack:', error);
-      // Fallback to generated cards if API fails
-      const gen = generateCards();
+      
+      const validCards = fetchedCards.filter(card => card && card.name && card.image);
+      if (validCards.length === 0) {
+        throw new Error('No valid cards returned from API');
+      }
+      
+      // Add cards to collection
       setCollection(prev => {
         const remainingSpace = APP_CONFIG.maxCollectionSize - prev.length;
-        const toAdd = remainingSpace >= gen.length ? gen : gen.slice(0, Math.max(0, remainingSpace));
+        const toAdd = remainingSpace >= validCards.length ? validCards : validCards.slice(0, Math.max(0, remainingSpace));
         return remainingSpace > 0 ? [...prev, ...toAdd] : prev;
       });
-      setPendingOpenedIds(gen.map(c => c.id));
-      setCards(gen);
-    } finally {
-      // Data is ready; now enforce minimum shake time before explosion
-      setReadyToReveal(true);
-
-      const MIN_SHAKE_MS = 900;
-      const nowTs = Date.now();
-      const elapsed = shakeStartAt ? nowTs - shakeStartAt : 0;
-      const remaining = Math.max(0, MIN_SHAKE_MS - elapsed);
-
-      // Keep shaking visible until min window has elapsed
-      setTimeout(() => {
-        // Minimum shake window complete
-        setMinShakeDone(true);
-        // Stop the shake flag now so PackDisplay leaves shake variant
-        setIsLoadingCards(false);
-        // Trigger explode now that both conditions (min window + ready) are satisfied
-        requestAnimationFrame(() => setExploding(true));
-      }, remaining);
-      // openingPackType stays set during explosion so the correct pack can exit
+      
+      setPendingOpenedIds(validCards.map(c => c.id));
+      setCards(validCards);
+      
+      // Show cards immediately after fetching
+      setAnimationPhase('cards');
+      setTriggerPackExplosion(true); // Trigger explosion in PackOpeningScreen
+      
+    } catch (error) {
+      console.error('Error opening pack:', error);
+      addNotification({
+        message: `API Error: ${error.message}`,
+        type: 'error',
+        duration: 5000
+      });
+      
+      // Reset animation states
+      setIsOpening(false);
+      setOpeningPackType(null);
+      setAnimationPhase('idle');
+      setIsLoading(false); // End loading on error
+      setTriggerPackExplosion(false); // Reset explosion trigger on error
     }
-  }, [currentPack, packInventory, addNotification, packs, shakeStartAt]); // deps simplified; minShakeDone is controlled inside
+  }, [currentPack, packInventory, addNotification, packs]);
+
+  const handlePackOpeningAnimationComplete = useCallback(() => {
+    setIsLoading(false); // End loading when PackOpeningScreen animation is complete
+    setTriggerPackExplosion(false); // Reset explosion trigger after animation
+  }, []);
 
   /**
    * Flips a card to reveal its face.
@@ -401,16 +367,20 @@ const AppContent = () => {
       setAnimatingOutCards(true); // Trigger exit animation
 
       setTimeout(() => {
-        // Collection was already updated on open; here we only clear UI state
+        // Reset all animation states
         setCards([]);
         setIsOpening(false);
-        setAnimatingOutCards(false); // Reset after cards are cleared
+        setAnimatingOutCards(false);
+        setAnimationPhase('idle');
+        setOpeningPackType(null);
+        setIsLoading(false); // Ensure loading is false when returning to idle
+        
         // Clear pending opened marker
         setPendingOpenedIds([]);
         localStorage.removeItem('mtgPendingOpenedCards');
-      }, 600); // snappier exit now that persistence already happened
+      }, 600);
     }
-  }, [cards, setFlippedCards]); // setCollection is stable and not needed in deps
+  }, [cards]);
 
 
 
@@ -419,13 +389,7 @@ const AppContent = () => {
    */
   const packConfig = useMemo(() => packs, [packs]); // Use dynamically loaded packs
 
-  // Ensure minimum shake window starts as soon as we begin opening
-  useEffect(() => {
-    if (isOpening && !minShakeDone) {
-      const t = setTimeout(() => setMinShakeDone(true), 900); // minimum shake
-      return () => clearTimeout(t);
-    }
-  }, [isOpening, minShakeDone]);
+  // No longer needed with simplified animation flow
 
   return (
     <div className={styles.app}>
@@ -455,56 +419,37 @@ const AppContent = () => {
 
       <div className={styles.mainContent}>
         <AnimatePresence mode="wait">
-          {/* Sequence:
-              click -> shake while loading
-              loading done -> stop shake -> explode (pack exit)
-              after explosion -> show cards
-            */}
-          {/* While opening and before explosion, show shaking packs.
-              Only enter explosion branch AFTER min shake and when explicitly exploding */}
-          {isOpening && !exploding ? (
-            <motion.div key="packs-shaking" initial={{ opacity: 1 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+          {/* Simplified animation sequence with clear phases */}
+          {!isOpening ? (
+            // Default state - show packs
+            <motion.div
+              key="packs"
+              initial={{ opacity: 1 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
               {Object.keys(packs).length > 0 && currentPack !== null ? (
                 <PackDisplay
                   packs={packConfig}
                   currentPack={currentPack}
-                  openPack={openPack}
-                  packInventory={packInventory}
-                  onOpenStore={() => setShowStore(true)}
-                  nextFreePackTime={nextFreePackTime}
-                  claimFreePack={claimFreePack}
-                  isShaking={true}
-                  openingPackType={openingPackType}
-                  exploding={false}
-                />
-              ) : (
-                <div>Loading packs...</div>
-              )}
-            </motion.div>
-          ) : isOpening && exploding && !(readyToReveal && cards.length > 0) ? (
-            <motion.div key="packs-exploding" initial={{ opacity: 1 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              {Object.keys(packs).length > 0 && currentPack !== null ? (
-                <PackDisplay
-                  packs={packConfig}
-                  currentPack={currentPack}
-                  openPack={openPack}
-                  packInventory={packInventory}
-                  onOpenStore={() => setShowStore(true)}
-                  nextFreePackTime={nextFreePackTime}
-                  claimFreePack={claimFreePack}
-                  isShaking={false}
-                  openingPackType={openingPackType}
-                  exploding={true}
-                  onExplosionComplete={() => {
+                  openPack={(packType) => {
+                    // Reset any lingering animation states before starting a new opening
                     setOpeningPackType(null);
-                    setExploding(false);
+                    setAnimationPhase('idle');
+                    // Then start the new opening sequence
+                    openPack(packType);
                   }}
+                  packInventory={packInventory}
+                  onOpenStore={() => setShowStore(true)}
+                  nextFreePackTime={nextFreePackTime}
+                  claimFreePack={claimFreePack}
                 />
               ) : (
                 <div>Loading packs...</div>
               )}
             </motion.div>
-          ) : isOpening && readyToReveal && cards.length > 0 ? (
+          ) : (
+            // Show cards
             <motion.div
               key="cards"
               initial={{ opacity: 0, scale: 0.9 }}
@@ -526,30 +471,6 @@ const AppContent = () => {
                 onAction={handleCardAction}
                 allCardsFlipped={allCardsFlipped}
               />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="packs"
-              initial={{ opacity: 1 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              {Object.keys(packs).length > 0 && currentPack !== null ? (
-                <PackDisplay
-                  packs={packConfig}
-                  currentPack={currentPack}
-                  openPack={openPack}
-                  packInventory={packInventory}
-                  onOpenStore={() => setShowStore(true)}
-                  nextFreePackTime={nextFreePackTime}
-                  claimFreePack={claimFreePack}
-                  isShaking={isLoadingCards || (!minShakeDone && isOpening && Boolean(openingPackType))}
-                  openingPackType={openingPackType}
-                  readyToReveal={readyToReveal}
-                />
-              ) : (
-                <div>Loading packs...</div>
-              )}
             </motion.div>
           )}
         </AnimatePresence>
@@ -590,6 +511,7 @@ const AppContent = () => {
       <footer className={styles.legalDisclaimer}>
         <p>All currency used within this simulation is entirely fictional and holds no real-world monetary value. All products presented are simulated and do not represent or replicate real-world goods. All referenced items, including card designs, names, and intellectual property, are the copyrighted property of Wizards of the Coast and Hasbro. This simulation is a fan-created experience and is not affiliated with, endorsed by, or associated with Wizards of the Coast or Hasbro.</p>
       </footer>
+      {isLoading && <PackOpeningScreen packConfig={packs[openingPackType]} onAnimationComplete={handlePackOpeningAnimationComplete} triggerExplosion={triggerPackExplosion} />} {/* Conditionally render PackOpeningScreen with packConfig */}
     </div>
   );
 };

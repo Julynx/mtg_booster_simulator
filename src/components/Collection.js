@@ -387,12 +387,21 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
                   />
                 )}
               </motion.div>
-              <div className={styles.previewInfo}>
-                <h3 className={styles.previewName}>{previewCard.name}</h3>
-                <div className={styles.previewDetails}>
-                  <span className={styles.previewRarity}>{previewCard.rarity}</span>
-                  {previewCard.set && <span className={styles.previewSet}>{previewCard.set}</span>}
-                  {previewCard.foil && <span style={{
+                <div className={styles.previewInfo}>
+                  <h3 className={styles.previewName}>{previewCard.name}</h3>
+                  <div className={styles.previewDetails}>
+                    <span className={styles.previewRarity}>{previewCard.rarity}</span>
+                    {previewCard.set && previewCard.setCode && (
+                      <a
+                        href={`https://scryfall.com/sets/${previewCard.setCode.toLowerCase()}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={styles.cardSetLink}
+                      >
+                        {previewCard.set}
+                      </a>
+                    )}
+                    {previewCard.foil && <span style={{
                     display: 'inline-block',
                     background: 'linear-gradient(to right, violet, indigo, blue, green, yellow, orange, red)',
                     color: 'white',
