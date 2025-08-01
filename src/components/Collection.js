@@ -36,22 +36,61 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
     return { borderColor: getRarityColor(safeRarity) };
   }, [getRarityColor]); // Added getRarityColor to dependencies
 
-  const sellCard = useCallback((cardToSell, count = 1) => {
-    let soldValue = 0;
-    const cardsToRemove = [];
-    
-    const newCollection = collection.filter(card => {
-      if (card.name === cardToSell.name && cardsToRemove.length < count) {
-        cardsToRemove.push(card);
-        soldValue += card.price || 0.10;
-        return false;
-      }
-      return true;
-    });
+  // Ref to throttle rapid sell actions and avoid state thrash causing list to break
+  const sellingRef = useRef(false);
+  const sellQueueRef = useRef(0);
 
+  const processSellQueue = useCallback(() => {
+    if (sellingRef.current || sellQueueRef.current <= 0) return;
+    sellingRef.current = true;
+    const toSell = sellQueueRef.current;
+    sellQueueRef.current = 0;
+
+    // Batch state updates in a single mutation to keep react-window stable
+    let soldValue = 0;
+    let remainingToRemove = toSell;
+
+    // Prefer removing by unique instance id to avoid unintended removals
+    const newCollection = [];
+    for (const card of collection) {
+      if (
+        remainingToRemove > 0 &&
+        card.name === (cardDisplayCandidateRef.current?.name ?? '') && // best-effort name match from last clicked
+        card.setCode === (cardDisplayCandidateRef.current?.setCode ?? card.setCode) &&
+        card.foil === (cardDisplayCandidateRef.current?.foil ?? card.foil)
+      ) {
+        // remove this instance
+        soldValue += card.price || 0.10;
+        remainingToRemove -= 1;
+      } else {
+        newCollection.push(card);
+      }
+    }
+
+    // Commit the batched state updates
     setCollection(newCollection);
     setMoney(prev => prev + soldValue);
+
+    // Let the UI settle before allowing next batch
+    setTimeout(() => {
+      sellingRef.current = false;
+      // If more queued while we were processing, handle them now
+      if (sellQueueRef.current > 0) {
+        processSellQueue();
+      }
+    }, 16); // roughly one frame (~60fps)
   }, [collection, setCollection, setMoney]);
+
+  // Keep track of last clicked "group" candidate to scope deletions correctly
+  const cardDisplayCandidateRef = useRef(null);
+
+  const sellCard = useCallback((cardToSell, count = 1) => {
+    // Remember which grouped card we are operating on
+    cardDisplayCandidateRef.current = cardToSell;
+    // Queue the amount to sell and process in a batched manner
+    sellQueueRef.current += Math.max(1, count);
+    processSellQueue();
+  }, [processSellQueue]);
 
   const processedCards = useMemo(() => {
     let filtered = collection;
@@ -104,18 +143,26 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
     const endIndex = Math.min(startIndex + columnCount, groupedCardsArray.length);
 
     return (
-      <div style={{ ...style, display: 'flex', justifyContent: 'flex-start', alignItems: 'flex-start', gap: '1.5rem' }}> {/* Changed justify-content and added gap */}
+      <div
+        style={{
+          ...style,
+          display: 'grid',
+          gridTemplateColumns: `repeat(${columnCount}, minmax(0, 1fr))`,
+          gap: '1.5rem',
+          alignItems: 'flex-start'
+        }}
+      >
         {Array.from({ length: endIndex - startIndex }).map((_, colIndex) => {
           const cardGroup = groupedCardsArray[startIndex + colIndex];
           if (!cardGroup) return null;
 
           return (
             <motion.div
-              key={cardGroup.name} // Use cardGroup.name as key for motion.div
+              key={`${cardGroup.name}-${cardGroup.set || 'unknown'}-${cardGroup.foil ? 'foil' : 'nonfoil'}`}
               className={`${styles.cardWrapper} ${cardGroup.foil ? styles.foilCardBackground : ''}`}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ delay: (startIndex + colIndex) * 0.02 }}
-              style={{ flex: '0 0 auto' }} // Ensure cards don't stretch
+              style={{ width: '100%' }}
             >
               <div className={styles.cardContainer}>
                 <motion.img

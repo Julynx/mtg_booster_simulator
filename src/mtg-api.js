@@ -61,21 +61,21 @@ export const fetchCardsBySet = async (setCode, count = 15) => {
  * @param {string} setCode - The set code
  * @returns {Promise<Array>} Array of 15 cards representing a booster pack
  */
-export const fetchBoosterPack = async (setCode) => {
-  const rawCards = [];
-  const foilStatuses = []; // To store the intended foil status for each card
-
-  // Helper to fetch a raw card with specific rarity, foil status, and type
-  // This helper will now return the raw Scryfall card object
-  const fetchRawCard = async (rarity, queryFoil = null, type = null) => {
+export const fetchBoosterPack = async (setCode, slots = null) => {
+  // Helper to fetch a raw card with specific constraints; returns raw Scryfall card
+  const fetchRawCard = async ({ rarity = null, queryFoil = null, pool = null, type = null }) => {
     let query = `set:${setCode}`;
     if (rarity) query += ` rarity:${rarity}`;
     if (type) query += ` type:${type}`;
+    if (pool === 'land') {
+      // Land pool: caller will set rarity/type as needed; keep here as generic
+      query += ` t:land`;
+    }
     if (queryFoil === true) query += ` is:foil`;
     if (queryFoil === false) query += ` is:nonfoil`;
 
     try {
-      const response = await fetch(`https://api.scryfall.com/cards/random?q=${query}`);
+      const response = await fetch(`https://api.scryfall.com/cards/random?q=${encodeURIComponent(query)}`);
       const card = await response.json();
       if (card && card.object !== 'error') {
         return card;
@@ -84,61 +84,187 @@ export const fetchBoosterPack = async (setCode) => {
       console.warn(`Failed to fetch raw card with query "${query}":`, error);
     }
     // Fallback to generic random card if specific fetch fails
-    const randomCardResponse = await fetch('https://api.scryfall.com/cards/random');
-    const randomCard = await randomCardResponse.json();
-    if (randomCard && randomCard.object !== 'error') {
-      return randomCard;
-    }
+    try {
+      const randomCardResponse = await fetch('https://api.scryfall.com/cards/random');
+      const randomCard = await randomCardResponse.json();
+      if (randomCard && randomCard.object !== 'error') {
+        return randomCard;
+      }
+    } catch {}
     return null;
   };
 
+  const pushIfCard = (arr, raw, explicitFoil = null) => {
+    if (raw) arr.push(formatCardData(raw, explicitFoil));
+  };
+
+  // If slots provided, honor them; otherwise fall back to legacy 14-card logic
+  if (Array.isArray(slots) && slots.length > 0) {
+    const formatted = [];
+
+    // Per-slot processing
+    for (const slot of slots) {
+      const count = typeof slot.count === 'function' ? Number(slot.count({})) : Number(slot.count || 0);
+      for (let i = 0; i < count; i++) {
+        // Resolve slot parameters
+        let resolved = null;
+        if (typeof slot.resolver === 'function') {
+          try {
+            resolved = slot.resolver({});
+          } catch (e) {
+            console.warn('Slot resolver error:', e);
+          }
+        }
+
+        // Determine rarity via odds if provided
+        let rarity = resolved?.rarity || null;
+        if (!rarity && slot.odds && typeof slot.odds === 'object') {
+          const entries = Object.entries(slot.odds);
+          let r = Math.random();
+          for (const [rar, weight] of entries) {
+            r -= Number(weight) || 0;
+            if (r <= 0) {
+              rarity = rar;
+              break;
+            }
+          }
+          if (!rarity && entries.length > 0) {
+            rarity = entries[entries.length - 1][0];
+          }
+        }
+        // Fallback rarity based on pool
+        if (!rarity && slot.pool && ['common','uncommon','rare','mythic'].includes(slot.pool)) {
+          rarity = slot.pool;
+        }
+
+        // Determine foil flag
+        const foil = typeof slot.foil === 'boolean' ? slot.foil : (resolved?.foil ?? null);
+
+        // Determine type/pool-specific behavior
+        let type = null;
+        if (slot.pool === 'land' || resolved?.pool === 'land') {
+          // Implement: 95% basic land from set, 5% non-basic land from set
+          const pickBasic = Math.random() < 0.95;
+          if (pickBasic) {
+            // Basic lands are type:basic land; try within set
+            const raw = await fetchRawCard({ rarity: null, queryFoil: foil, pool: 'land', type: 'basic' });
+            pushIfCard(formatted, raw, foil);
+          } else {
+            // Non-basic land in set: t:land -t:basic
+            let query = `set:${setCode} t:land -t:basic`;
+            if (foil === true) query += ' is:foil';
+            if (foil === false) query += ' is:nonfoil';
+            try {
+              const response = await fetch(`https://api.scryfall.com/cards/random?q=${encodeURIComponent(query)}`);
+              const card = await response.json();
+              if (card && card.object !== 'error') {
+                pushIfCard(formatted, card, foil);
+              } else {
+                // fallback to any land
+                const fallback = await fetchRawCard({ rarity: null, queryFoil: foil, pool: 'land' });
+                pushIfCard(formatted, fallback, foil);
+              }
+            } catch {
+              const fallback = await fetchRawCard({ rarity: null, queryFoil: foil, pool: 'land' });
+              pushIfCard(formatted, fallback, foil);
+            }
+          }
+          continue; // land slot handled
+        }
+
+        // Wildcard or generic pool: use rarity if resolved/odds selected, otherwise any
+        const raw = await fetchRawCard({
+          rarity: rarity || null,
+          queryFoil: foil,
+          pool: slot.pool || resolved?.pool || null,
+          type
+        });
+        pushIfCard(formatted, raw, foil);
+      }
+    }
+
+    return formatted;
+  }
+
+  // Legacy fallback: 14-card construction similar to previous behavior
+  const rawCards = [];
+  const foilStatuses = [];
+
   // 7 Common cards
   for (let i = 0; i < 7; i++) {
-    rawCards.push(await fetchRawCard('common'));
-    foilStatuses.push(false); // Commons are non-foil
+    rawCards.push(await fetchRawCard({ rarity: 'common', queryFoil: false }));
+    foilStatuses.push(false);
   }
 
   // 3 Uncommon cards
   for (let i = 0; i < 3; i++) {
-    rawCards.push(await fetchRawCard('uncommon'));
-    foilStatuses.push(false); // Uncommons are non-foil
+    rawCards.push(await fetchRawCard({ rarity: 'uncommon', queryFoil: false }));
+    foilStatuses.push(false);
   }
 
   // 1 Rare or Mythic Rare
   const isMythic = Math.random() < (1 / 7);
-  rawCards.push(await fetchRawCard(isMythic ? 'mythic' : 'rare'));
-  foilStatuses.push(false); // Rare/Mythic slot is non-foil by default
+  rawCards.push(await fetchRawCard({ rarity: isMythic ? 'mythic' : 'rare', queryFoil: false }));
+  foilStatuses.push(false);
 
-  // 1 Land (20% chance of being foil)
-  const isLandFoil = Math.random() < 0.2;
-  rawCards.push(await fetchRawCard(null, isLandFoil, 'basic'));
-  foilStatuses.push(isLandFoil);
+  // Land slot: 95% basic in-set, 5% non-basic in-set
+  const pickBasic = Math.random() < 0.95;
+  if (pickBasic) {
+    rawCards.push(await fetchRawCard({ rarity: null, queryFoil: null, pool: 'land', type: 'basic' }));
+    foilStatuses.push(false);
+  } else {
+    // non-basic land in set
+    try {
+      const query = `set:${setCode} t:land -t:basic`;
+      const response = await fetch(`https://api.scryfall.com/cards/random?q=${encodeURIComponent(query)}`);
+      const card = await response.json();
+      if (card && card.object !== 'error') {
+        rawCards.push(card);
+        foilStatuses.push(false);
+      } else {
+        const fallback = await fetchRawCard({ rarity: null, queryFoil: false, pool: 'land' });
+        rawCards.push(fallback);
+        foilStatuses.push(false);
+      }
+    } catch {
+      const fallback = await fetchRawCard({ rarity: null, queryFoil: false, pool: 'land' });
+      rawCards.push(fallback);
+      foilStatuses.push(false);
+    }
+  }
 
   // 1 Non-foil wildcard (any rarity)
-  rawCards.push(await fetchRawCard(null, false));
+  rawCards.push(await fetchRawCard({ rarity: null, queryFoil: false }));
   foilStatuses.push(false);
 
   // 1 Foil wildcard (any rarity)
-  rawCards.push(await fetchRawCard(null, true));
+  rawCards.push(await fetchRawCard({ rarity: null, queryFoil: true }));
   foilStatuses.push(true);
 
-  // Filter out any nulls from failed fetches and ensure 14 cards
+  // Format and pad/trim to 14
   let finalFormattedCards = [];
   for (let i = 0; i < rawCards.length; i++) {
     if (rawCards[i]) {
       finalFormattedCards.push(formatCardData(rawCards[i], foilStatuses[i]));
     }
   }
-
-  // Pad with random cards if less than 14 (shouldn't happen often with fallbacks)
   while (finalFormattedCards.length < 14) {
-    // For padding, just fetch a random card and assume non-foil
-    const randomCardResponse = await fetch('https://api.scryfall.com/cards/random');
-    const randomCard = await randomCardResponse.json();
-    if (randomCard && randomCard.object !== 'error') {
-      finalFormattedCards.push(formatCardData(randomCard, false));
-    } else {
-      // If even random fails, use a placeholder
+    try {
+      const randomCardResponse = await fetch('https://api.scryfall.com/cards/random');
+      const randomCard = await randomCardResponse.json();
+      if (randomCard && randomCard.object !== 'error') {
+        finalFormattedCards.push(formatCardData(randomCard, false));
+      } else {
+        finalFormattedCards.push({
+          id: `placeholder_${Date.now()}_${Math.random()}`,
+          name: 'Placeholder Card',
+          rarity: 'common',
+          image: 'https://placehold.co/200x280/cccccc/000000?text=Error',
+          foil: false,
+          type: 'unknown'
+        });
+      }
+    } catch {
       finalFormattedCards.push({
         id: `placeholder_${Date.now()}_${Math.random()}`,
         name: 'Placeholder Card',
@@ -149,10 +275,7 @@ export const fetchBoosterPack = async (setCode) => {
       });
     }
   }
-
-  // Trim to exactly 14 cards
   finalFormattedCards = finalFormattedCards.slice(0, 14);
-
   return finalFormattedCards;
 };
 
@@ -208,10 +331,23 @@ const formatCardData = (card, explicitFoil = null) => {
     imageUrl = `https://placehold.co/200x280/${getRarityColor(rarity).replace('#', '')}/ffffff?text=${card.name || 'MTG Card'}`;
   }
   
-  // Get price (USD)
+  // Get price with foil handling: prefer usd_foil for foil cards, fallback to usd
   let price = 0;
-  if (card.prices && card.prices.usd) {
-    price = parseFloat(card.prices.usd) || 0;
+  if (card.prices) {
+    const rawFoil = typeof card.prices.usd_foil === 'string' ? parseFloat(card.prices.usd_foil) : NaN;
+    const rawUsd = typeof card.prices.usd === 'string' ? parseFloat(card.prices.usd) : NaN;
+    const isFoil = explicitFoil !== null ? explicitFoil : (card.foil || false);
+
+    if (isFoil && !isNaN(rawFoil)) {
+      price = rawFoil;
+    } else if (!isNaN(rawUsd)) {
+      price = rawUsd;
+    } else if (!isNaN(rawFoil)) {
+      // As a last resort, if usd is missing but usd_foil exists (and even if card isn't marked foil), use it
+      price = rawFoil;
+    } else {
+      price = 0;
+    }
   }
   
   // Generate a unique ID for each card instance to handle duplicates properly

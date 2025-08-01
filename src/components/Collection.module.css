@@ -169,7 +169,7 @@
 .emptyCollection {
   color: #9ca3af;
   text-align: center;
-  padding: 2rem 0;
+  padding: 20rem 0;
 }
 
 .collectionGrid {
@@ -243,10 +243,10 @@
   font-weight: 600;
   color: white;
   margin: 0.5rem 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  /* Single-line truncation with ellipsis for very long names */
+  white-space: nowrap;
   overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cardDetails {

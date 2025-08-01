@@ -1,5 +1,5 @@
-import React, { useCallback, useState, useEffect } from 'react';
-import { motion, AnimatePresence, useAnimation } from 'framer-motion'; // Added AnimatePresence, useAnimation
+import React, { useCallback, useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence, useAnimation } from 'framer-motion';
 import { DollarSign, Gift, ShoppingCart } from 'lucide-react';
 import styles from './PackDisplay.module.css';
 
@@ -9,33 +9,28 @@ const SparkleAnimation = ({ delay }) => {
 
   useEffect(() => {
     const animateSparkle = async () => {
-      // Set initial random position and scale to 0
       const initialLeft = `${Math.random() * 100}%`;
-      const initialTop = `${(Math.random() * 80)}%`; // Removed initialTopOffset
+      const initialTop = `${Math.random() * 80}%`;
       await controls.set({ scale: 0, rotate: 0, left: initialLeft, top: initialTop });
 
-      // Wait for initial delay
       await new Promise(resolve => setTimeout(resolve, delay * 1000));
 
       while (true) {
-        // Appear and rotate (from current position)
         await controls.start({
           scale: 1,
           rotate: 180,
-          transition: { duration: 2, ease: "easeInOut" } // Increased duration
+          transition: { duration: 2, ease: 'easeInOut' }
         });
 
-        // Disappear and rotate further
         await controls.start({
           scale: 0,
           rotate: 360,
-          transition: { duration: 2, ease: "easeInOut" } // Increased duration
+          transition: { duration: 2, ease: 'easeInOut' }
         });
 
-        // Move invisibly to new random position
         const newLeft = `${Math.random() * 100}%`;
-        const newTop = `${(Math.random() * 80)}%`; // Removed initialTopOffset
-        await controls.set({ left: newLeft, top: newTop }); // Set new position while invisible
+        const newTop = `${Math.random() * 80}%`;
+        await controls.set({ left: newLeft, top: newTop });
       }
     };
 
@@ -43,11 +38,7 @@ const SparkleAnimation = ({ delay }) => {
   }, [controls, delay]);
 
   return (
-    <motion.div
-      className={styles.sparkle} // Keep only the base sparkle class for positioning
-      animate={controls}
-    >
-      {/* A simple 4-point star SVG. Elongated points and curved sides are complex for direct SVG path. */}
+    <motion.div className={styles.sparkle} animate={controls}>
       <svg width="16" height="16" viewBox="0 0 24 24" fill="#FFFFFF" xmlns="http://www.w3.org/2000/svg">
         <path d="M12 0L14.6 9.4L24 12L14.6 14.6L12 24L9.4 14.6L0 12L9.4 9.4L12 0Z" />
       </svg>
@@ -106,9 +97,25 @@ const CountdownTimer = ({ targetTime }) => {
  * @param {Function} props.onOpenStore - Function to open the store
  * @param {Date} props.nextFreePackTime - Time when next free pack is available
  * @param {Function} props.claimFreePack - Function to claim free pack
+ * @param {boolean} props.isShaking - Explicit flag to indicate shake phase
+ * @param {string|null} props.openingPackType - Which pack is opening
+ * @param {boolean} props.exploding - Explode animation flag
+ * @param {Function} props.onExplosionComplete - Callback when explode finishes
  * @returns {JSX.Element} The rendered pack display component
  */
-const PackDisplay = ({ packs, currentPack, openPack, packInventory, onOpenStore, nextFreePackTime, claimFreePack }) => {
+const PackDisplay = ({
+  packs,
+  currentPack,
+  openPack,
+  packInventory,
+  onOpenStore,
+  nextFreePackTime,
+  claimFreePack,
+  isShaking,
+  openingPackType,
+  exploding,
+  onExplosionComplete
+}) => {
   const totalPacks = Object.values(packInventory).reduce((sum, count) => sum + count, 0);
 
   // Get the first available pack type that has inventory
@@ -124,10 +131,14 @@ const PackDisplay = ({ packs, currentPack, openPack, packInventory, onOpenStore,
   const availablePackType = getFirstAvailablePack();
   const packConfig = packs[availablePackType];
 
+  // Only the clicked/active pack should palpitate/shake.
+  // Derive a local boolean so we do not accidentally animate all packs.
+  const isAnyPackShaking = !!isShaking;
+  // Guard: never trigger explode before a visible shake phase by defaulting to shake when both flags false but opening
+
   const handleStoreClick = useCallback(() => {
     onOpenStore();
   }, [onOpenStore]);
-
 
   // Animation configurations
   const containerAnimation = {
@@ -135,30 +146,46 @@ const PackDisplay = ({ packs, currentPack, openPack, packInventory, onOpenStore,
     whileTap: { scale: 0.95 },
     initial: { opacity: 0, scale: 0 },
     animate: { opacity: 1, scale: 1 },
-    transition: { duration: 0.6, type: "spring", bounce: 0.4 }
+    transition: { duration: 0.6, type: 'spring', bounce: 0.4 }
   };
 
-  const packAnimation = {
-    // This animation is no longer used for the pack container itself,
-    // but the variable is kept for consistency if needed elsewhere.
-    // The image overlay handles the visual animation.
-    transition: { duration: 2, repeat: Infinity }
+  // Variants: idle, shake, explode
+  const packVariants = {
+    idle: { opacity: 1, scale: 1, rotate: 0, x: 0, y: 0 },
+    // Simplify shake to keyframes on the container to avoid variant override issues
+    shake: {
+      x: [0, -10, 10, -10, 10, 0],
+      y: [0, -6, 6, -6, 6, 0],
+      rotate: [0, -3, 3, -3, 3, 0],
+      transition: {
+        duration: 0.4,
+        repeat: Infinity,
+        repeatType: 'loop',
+        ease: 'easeInOut'
+      }
+    },
+    explode: {
+      scale: [1, 1.15, 0.95, 1.8, 0.5],
+      rotate: [0, 12, -12, 540, 540],
+      opacity: [1, 1, 1, 0.7, 0],
+      y: [0, -10, 8, -160, -200],
+      filter: [
+        'drop-shadow(0 0 0px rgba(255,255,255,0))',
+        'drop-shadow(0 0 18px rgba(255,255,255,0.9))',
+        'drop-shadow(0 0 28px rgba(255,255,255,1))',
+        'drop-shadow(0 0 10px rgba(255,255,255,0.6))',
+        'drop-shadow(0 0 0px rgba(255,255,255,0))'
+      ],
+      transition: { duration: 0.9, ease: 'easeIn' }
+    }
   };
 
   // If no packs available, show store link
   if (totalPacks === 0) {
     return (
-      <div className={styles.packDisplayContainer}>
-        <motion.div
-          className={styles.packDisplay}
-          onClick={handleStoreClick}
-          {...containerAnimation}
-        >
-          <motion.div
-            className={`${styles.pack} bg-gradient-to-br from-gray-600 to-gray-800 ${styles.packNoPacksBorder}`}
-            {...packAnimation}
-          >
-            {/* Pack label */}
+      <div className={styles.packDisplayContainer} style={{ marginTop: '13rem' }}>
+        <motion.div className={styles.packDisplay} onClick={handleStoreClick} {...containerAnimation}>
+          <motion.div className={`${styles.pack} bg-gradient-to-br from-gray-600 to-gray-800 ${styles.packNoPacksBorder}`}>
             <div className={styles.label}>
               <ShoppingCart size={48} style={{ marginBottom: '0.5rem' }} />
               <span className={styles.packName}>No Packs Left</span>
@@ -167,7 +194,6 @@ const PackDisplay = ({ packs, currentPack, openPack, packInventory, onOpenStore,
           </motion.div>
         </motion.div>
 
-        {/* Store Info */}
         <div className={styles.storeInfo}>
           <div className={styles.moneyInfo}>
             <DollarSign size={20} />
@@ -176,11 +202,7 @@ const PackDisplay = ({ packs, currentPack, openPack, packInventory, onOpenStore,
           <div className={styles.freePackInfo}>
             <Gift size={20} />
             <span className={styles.freePackText}>
-              {nextFreePackTime ? (
-                <CountdownTimer targetTime={nextFreePackTime} />
-              ) : (
-                'Claim your free pack!'
-              )}
+              {nextFreePackTime ? <CountdownTimer targetTime={nextFreePackTime} /> : 'Claim your free pack!'}
             </span>
           </div>
         </div>
@@ -191,16 +213,8 @@ const PackDisplay = ({ packs, currentPack, openPack, packInventory, onOpenStore,
   if (!packConfig) {
     return (
       <div className={styles.packDisplayContainer}>
-        <motion.div
-          className={styles.packDisplay}
-          onClick={handleStoreClick} // Direct to store if no pack config
-          {...containerAnimation}
-        >
-          <motion.div
-            className={`${styles.pack} bg-gradient-to-br from-gray-600 to-gray-800`}
-            {...packAnimation}
-          >
-            {/* Pack label */}
+        <motion.div className={styles.packDisplay} onClick={handleStoreClick} {...containerAnimation}>
+          <motion.div className={`${styles.pack} bg-gradient-to-br from-gray-600 to-gray-800`}>
             <div className={styles.label}>
               <ShoppingCart size={48} style={{ marginBottom: '0.5rem' }} />
               <span className={styles.packName}>Loading Packs...</span>
@@ -208,7 +222,6 @@ const PackDisplay = ({ packs, currentPack, openPack, packInventory, onOpenStore,
             </div>
           </motion.div>
         </motion.div>
-        {/* Store Info */}
         <div className={styles.storeInfo}>
           <div className={styles.moneyInfo}>
             <DollarSign size={20} />
@@ -217,11 +230,7 @@ const PackDisplay = ({ packs, currentPack, openPack, packInventory, onOpenStore,
           <div className={styles.freePackInfo}>
             <Gift size={20} />
             <span className={styles.freePackText}>
-              {nextFreePackTime ? (
-                <CountdownTimer targetTime={nextFreePackTime} />
-              ) : (
-                'Claim your free pack!'
-              )}
+              {nextFreePackTime ? <CountdownTimer targetTime={nextFreePackTime} /> : 'Claim your free pack!'}
             </span>
           </div>
         </div>
@@ -235,6 +244,12 @@ const PackDisplay = ({ packs, currentPack, openPack, packInventory, onOpenStore,
         {Object.entries(packInventory).map(([packType, count]) => {
           if (count <= 0) return null;
           const config = packs[packType];
+          const isTarget = openingPackType === packType;
+
+          // Only allow shake for the target pack, and only before explode starts.
+          // Additionally, if this is the target and NOT exploding yet, force shake when parent indicates opening (isShaking can be false briefly).
+          const shouldShake = isTarget && (!exploding) && (isAnyPackShaking || Boolean(openingPackType));
+
           return (
             <motion.div
               key={packType}
@@ -242,23 +257,38 @@ const PackDisplay = ({ packs, currentPack, openPack, packInventory, onOpenStore,
               onClick={() => openPack(packType)}
               {...containerAnimation}
             >
-              <AnimatePresence>
+              <AnimatePresence mode="wait">
                 <motion.div
-                  key={config.name}
+                  key={`${config.name}-${packType}`}
                   className={styles.pack}
-                  exit={{ opacity: 0, scale: 1.5, rotate: 360, y: -100, transition: { duration: 0.5 } }}
+                  style={{ transformOrigin: '50% 50%' }}
+                  initial={false}
+                  variants={packVariants}
+                  // Drive variant exclusively from state; no extra transitions that might cancel keyframes
+                  animate={isTarget ? (exploding ? 'explode' : shouldShake ? 'shake' : 'idle') : 'idle'}
+                  transition={undefined}
+                  onAnimationComplete={(variant) => {
+                    if (variant === 'explode' && isTarget && exploding && onExplosionComplete) {
+                      onExplosionComplete();
+                    }
+                  }}
                 >
-                  {/* New Shine Overlay */}
+                  {/* Shine Overlay */}
                   <motion.div
                     className={styles.shine}
-                    initial={{ x: '-100%' }}
-                    animate={{ x: '100%' }}
-                    transition={{ duration: 1.5, repeat: Infinity, ease: "linear", repeatDelay: 1 }}
+                    initial={{ x: '-120%' }}
+                    animate={{ x: exploding && isTarget ? '140%' : '120%' }}
+                    transition={{
+                      duration: shouldShake ? 0.7 : 1.3,
+                      repeat: Infinity,
+                      ease: 'linear',
+                      repeatDelay: shouldShake ? 0.15 : 0.9
+                    }}
                     style={{
-                      maskImage: `url(${packConfig.image})`, // Use booster image as mask
-                      maskMode: 'alpha', // Mask based on alpha channel
-                      WebkitMaskImage: `url(${packConfig.image})`, // Webkit prefix
-                      WebkitMaskMode: 'alpha', // Webkit prefix
+                      maskImage: `url(${packConfig.image})`,
+                      maskMode: 'alpha',
+                      WebkitMaskImage: `url(${packConfig.image})`,
+                      WebkitMaskMode: 'alpha'
                     }}
                   />
 
@@ -268,14 +298,22 @@ const PackDisplay = ({ packs, currentPack, openPack, packInventory, onOpenStore,
                     alt={config.name}
                     className={styles.packImage}
                     animate={{
-                      filter: [
-                        'drop-shadow(0 0 0px rgba(147, 51, 234, 0))',
-                        'drop-shadow(0 0 8px rgba(255, 255, 255, 0.5))',
-                        'drop-shadow(0 0 8px rgba(255, 255, 255, 0.5))', // Hold the shining state
-                        'drop-shadow(0 0 0px rgba(147, 51, 234, 0))'
-                      ]
+                      filter: shouldShake
+                        ? [
+                            'drop-shadow(0 0 0px rgba(147, 51, 234, 0))',
+                            'drop-shadow(0 0 12px rgba(255, 255, 255, 0.7))',
+                            'drop-shadow(0 0 12px rgba(255, 255, 255, 0.7))',
+                            'drop-shadow(0 0 0px rgba(147, 51, 234, 0))'
+                          ]
+                        : [
+                            'drop-shadow(0 0 0px rgba(147, 51, 234, 0))',
+                            'drop-shadow(0 0 8px rgba(255, 255, 255, 0.5))',
+                            'drop-shadow(0 0 8px rgba(255, 255, 255, 0.5))',
+                            'drop-shadow(0 0 0px rgba(147, 51, 234, 0))'
+                          ],
+                      scale: shouldShake ? [1, 1.012, 0.988, 1.012, 1] : 1
                     }}
-                    transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", times: [0, 0.35, 0.65, 1] }} // Adjusted times for longer hold
+                    transition={shouldShake ? { duration: 0.6, repeat: Infinity, ease: 'easeInOut' } : { duration: 0.8, ease: 'easeInOut' }}
                   />
 
                   {/* Pack info below image */}
@@ -285,7 +323,7 @@ const PackDisplay = ({ packs, currentPack, openPack, packInventory, onOpenStore,
                   </div>
 
                   {/* Sparkle effects */}
-                  {Array.from({ length: 5 }).map((_, i) => ( // Render 5 SparkleAnimation components
+                  {Array.from({ length: 5 }).map((_, i) => (
                     <SparkleAnimation key={i} delay={i * 0.2} />
                   ))}
                 </motion.div>
@@ -304,11 +342,7 @@ const PackDisplay = ({ packs, currentPack, openPack, packInventory, onOpenStore,
         <div className={styles.freePackInfo}>
           <Gift size={20} />
           <span className={styles.freePackText}>
-            {nextFreePackTime ? (
-              <CountdownTimer targetTime={nextFreePackTime} />
-            ) : (
-              'Claim your free pack!'
-            )}
+            {nextFreePackTime ? <CountdownTimer targetTime={nextFreePackTime} /> : 'Claim your free pack!'}
           </span>
         </div>
       </div>

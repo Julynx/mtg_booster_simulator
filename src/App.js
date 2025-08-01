@@ -9,7 +9,7 @@ import Collection from './components/Collection';
 import BackgroundParticles from './components/BackgroundParticles';
 import Store from './components/Store';
 import { NotificationProvider, useNotification } from './components/NotificationProvider';
-import { getRarityColor, getAuraColor, validateCard, generateCards, loadBoosters } from './utils';
+import { getRarityColor, getAuraColor, generateCards, loadBoosters } from './utils';
 import { fetchBoosterPack } from './mtg-api';
 import { APP_CONFIG } from './config';
 import styles from './App.module.css';
@@ -23,6 +23,12 @@ const AppContent = () => {
   const [packs, setPacks] = useState({}); // State to store loaded booster packs
   const [currentPack, setCurrentPack] = useState(null); // Default to null, will be set after loading
   const [isOpening, setIsOpening] = useState(false);
+  const [isLoadingCards, setIsLoadingCards] = useState(false); // API in-flight
+  const [readyToReveal, setReadyToReveal] = useState(false); // Cards data is ready to reveal
+  const [exploding, setExploding] = useState(false); // Pack exit animation flag
+  const [openingPackType, setOpeningPackType] = useState(null); // Which pack is currently opening (for targeted shake)
+  const [minShakeDone, setMinShakeDone] = useState(false); // ensure a minimum shake duration before explosion
+  const [shakeStartAt, setShakeStartAt] = useState(null); // precise shake start timestamp
   const [cards, setCards] = useState([]);
   const [flippedCards, setFlippedCards] = useState(new Set());
   const [animatingOutCards, setAnimatingOutCards] = useState(false);
@@ -43,6 +49,17 @@ const AppContent = () => {
       }
     }
     return [];
+  });
+  // Track pending opened cards to make adding robust against reloads
+  const [pendingOpenedIds, setPendingOpenedIds] = useState(() => {
+    const saved = localStorage.getItem('mtgPendingOpenedCards');
+    if (!saved) return [];
+    try {
+      const parsed = JSON.parse(saved);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
   });
   const [showCollection, setShowCollection] = useState(false);
   const [money, setMoney] = useState(() => {
@@ -140,12 +157,34 @@ const AppContent = () => {
       // If no last free pack time is saved, set it to now to start the timer
       setLastFreePack(new Date());
     }
+
+    // Reconcile any pending opened cards (in case of reload/crash before UI "Continue")
+    try {
+      const savedPending = localStorage.getItem('mtgPendingOpenedCards');
+      if (savedPending) {
+        const pendingIds = JSON.parse(savedPending);
+        if (Array.isArray(pendingIds) && pendingIds.length > 0) {
+          // If collection already contains them, clear marker; otherwise we trust the persisted collection effect
+          // and simply clear the marker to avoid re-adding duplicates.
+          setPendingOpenedIds(pendingIds);
+          // If needed, a more complex reconciliation could verify presence; our IDs are unique per instance.
+          localStorage.removeItem('mtgPendingOpenedCards');
+          setPendingOpenedIds([]);
+        }
+      }
+    } catch (err) {
+      console.warn('Error reconciling pending opened cards:', err);
+    }
   }, [packs]); // Depend on 'packs' to ensure they are loaded before calculating free packs
 
   // Save data to localStorage whenever it changes
   useEffect(() => {
     localStorage.setItem('mtgCollection', JSON.stringify(collection));
   }, [collection]);
+
+  useEffect(() => {
+    localStorage.setItem('mtgPendingOpenedCards', JSON.stringify(pendingOpenedIds));
+  }, [pendingOpenedIds]);
 
   useEffect(() => {
     localStorage.setItem('mtgMoney', money.toString());
@@ -212,6 +251,10 @@ const AppContent = () => {
 
   /**
    * Opens a new booster pack with real MTG cards.
+   * Sequence:
+   * - Click -> start shaking immediately
+   * - Enforce minimum shake window (>= 900ms) even if API is instant
+   * - When both min window elapsed AND data ready, explode
    */
   const openPack = useCallback(async (packType = currentPack) => {
     // Check if we have packs available
@@ -225,6 +268,13 @@ const AppContent = () => {
     }
 
     setIsOpening(true);
+    setOpeningPackType(packType); // track which pack is opening
+    setExploding(false); // reset explosion state
+    setReadyToReveal(false); // We are not ready to reveal yet
+    setMinShakeDone(false); // reset min shake flag
+    setShakeStartAt(Date.now()); // mark shake start for enforcing minimum duration
+    setIsLoadingCards(true); // Set loading to true when starting to open (triggers shake) - keep after timestamps
+    setCards([]); // Reset cards to ensure PackDisplay renders during loading
     setFlippedCards(new Set());
     
     // Use the pack from inventory
@@ -239,34 +289,89 @@ const AppContent = () => {
       console.log('Pack config:', packConfig);
       
       console.log('Fetching booster pack for set code:', packConfig.setCode);
-      const realCards = await fetchBoosterPack(packConfig.setCode);
+
+      // Use per-slot fetching when slots exist; otherwise legacy fallback
+      let realCards = [];
+      if (Array.isArray(packConfig.slots) && packConfig.slots.length > 0) {
+        realCards = await fetchBoosterPack(packConfig.setCode, packConfig.slots);
+      } else {
+        realCards = await fetchBoosterPack(packConfig.setCode);
+      }
+
       console.log('Received real cards:', realCards);
       
       if (realCards && realCards.length > 0) {
         console.log('Setting real cards:', realCards.length);
         // Validate that we have real card data
         const validRealCards = realCards.filter(card => 
-          card && card.name && card.image // && card.image.includes('scryfall') - removed strict scryfall check
+          card && card.name && card.image
         );
         
         if (validRealCards.length > 0) {
           console.log('Valid real cards count:', validRealCards.length);
-          setCards(realCards);
+          // Prepare cards but do not reveal yet
+          setCollection(prev => {
+            const remainingSpace = APP_CONFIG.maxCollectionSize - prev.length;
+            const toAdd = remainingSpace >= validRealCards.length ? validRealCards : validRealCards.slice(0, Math.max(0, remainingSpace));
+            return remainingSpace > 0 ? [...prev, ...toAdd] : prev;
+          });
+          setPendingOpenedIds(validRealCards.map(c => c.id));
+          setCards(validRealCards);
         } else {
           console.warn('No valid real cards found, using generated cards as fallback');
-          setCards(generateCards());
+          const gen = generateCards();
+          setCollection(prev => {
+            const remainingSpace = APP_CONFIG.maxCollectionSize - prev.length;
+            const toAdd = remainingSpace >= gen.length ? gen : gen.slice(0, Math.max(0, remainingSpace));
+            return remainingSpace > 0 ? [...prev, ...toAdd] : prev;
+          });
+          setPendingOpenedIds(gen.map(c => c.id));
+          setCards(gen);
         }
       } else {
         // Fallback to generated cards if API fails
         console.warn('Failed to fetch real cards, using generated cards as fallback');
-        setCards(generateCards());
+        const gen = generateCards();
+        setCollection(prev => {
+          const remainingSpace = APP_CONFIG.maxCollectionSize - prev.length;
+          const toAdd = remainingSpace >= gen.length ? gen : gen.slice(0, Math.max(0, remainingSpace));
+          return remainingSpace > 0 ? [...prev, ...toAdd] : prev;
+        });
+        setPendingOpenedIds(gen.map(c => c.id));
+        setCards(gen);
       }
     } catch (error) {
       console.error('Error opening pack:', error);
       // Fallback to generated cards if API fails
-      setCards(generateCards());
+      const gen = generateCards();
+      setCollection(prev => {
+        const remainingSpace = APP_CONFIG.maxCollectionSize - prev.length;
+        const toAdd = remainingSpace >= gen.length ? gen : gen.slice(0, Math.max(0, remainingSpace));
+        return remainingSpace > 0 ? [...prev, ...toAdd] : prev;
+      });
+      setPendingOpenedIds(gen.map(c => c.id));
+      setCards(gen);
+    } finally {
+      // Data is ready; now enforce minimum shake time before explosion
+      setReadyToReveal(true);
+
+      const MIN_SHAKE_MS = 900;
+      const nowTs = Date.now();
+      const elapsed = shakeStartAt ? nowTs - shakeStartAt : 0;
+      const remaining = Math.max(0, MIN_SHAKE_MS - elapsed);
+
+      // Keep shaking visible until min window has elapsed
+      setTimeout(() => {
+        // Minimum shake window complete
+        setMinShakeDone(true);
+        // Stop the shake flag now so PackDisplay leaves shake variant
+        setIsLoadingCards(false);
+        // Trigger explode now that both conditions (min window + ready) are satisfied
+        requestAnimationFrame(() => setExploding(true));
+      }, remaining);
+      // openingPackType stays set during explosion so the correct pack can exit
     }
-  }, [currentPack, packInventory, addNotification, packs]); // Add 'packs' to dependencies
+  }, [currentPack, packInventory, addNotification, packs, shakeStartAt]); // deps simplified; minShakeDone is controlled inside
 
   /**
    * Flips a card to reveal its face.
@@ -296,23 +401,16 @@ const AppContent = () => {
       setAnimatingOutCards(true); // Trigger exit animation
 
       setTimeout(() => {
-        const validCards = cards.filter(validateCard);
-        
-        setCollection(prev => {
-          if (prev.length + validCards.length > APP_CONFIG.maxCollectionSize) {
-            console.warn('Collection size limit reached. Some cards will not be added.');
-            const remainingSpace = APP_CONFIG.maxCollectionSize - prev.length;
-            return [...prev, ...validCards.slice(0, remainingSpace)];
-          }
-          return [...prev, ...validCards];
-        });
-        
+        // Collection was already updated on open; here we only clear UI state
         setCards([]);
         setIsOpening(false);
         setAnimatingOutCards(false); // Reset after cards are cleared
-      }, 1000); // Adjusted delay for new exit animation (will be 0.8s + some buffer)
+        // Clear pending opened marker
+        setPendingOpenedIds([]);
+        localStorage.removeItem('mtgPendingOpenedCards');
+      }, 600); // snappier exit now that persistence already happened
     }
-  }, [cards, setFlippedCards, setCollection]);
+  }, [cards, setFlippedCards]); // setCollection is stable and not needed in deps
 
 
 
@@ -320,6 +418,14 @@ const AppContent = () => {
    * Memoized pack configuration
    */
   const packConfig = useMemo(() => packs, [packs]); // Use dynamically loaded packs
+
+  // Ensure minimum shake window starts as soon as we begin opening
+  useEffect(() => {
+    if (isOpening && !minShakeDone) {
+      const t = setTimeout(() => setMinShakeDone(true), 900); // minimum shake
+      return () => clearTimeout(t);
+    }
+  }, [isOpening, minShakeDone]);
 
   return (
     <div className={styles.app}>
@@ -348,35 +454,105 @@ const AppContent = () => {
       </motion.div>
 
       <div className={styles.mainContent}>
-        {!isOpening && Object.keys(packs).length > 0 && currentPack !== null ? ( // Conditionally render PackDisplay
-          <PackDisplay
-            packs={packConfig}
-            currentPack={currentPack}
-            openPack={openPack}
-            packInventory={packInventory}
-            onOpenStore={() => setShowStore(true)}
-            nextFreePackTime={nextFreePackTime}
-            claimFreePack={claimFreePack}
-          />
-        ) : !isOpening && (Object.keys(packs).length === 0 || currentPack === null) ? (
-          <div>Loading packs...</div> // Or a loading spinner
-        ) : (
-          <div className={`${styles.cardDisplayContainer} ${styles.cardDisplayContainerWithPadding}`}>
-            <CardDisplay
-              cards={cards}
-              flippedCards={flippedCards}
-              flipCard={flipCard}
-              getAuraColor={getAuraColor}
-              animatingOut={animatingOutCards} // New prop
-            />
-            <ActionButtons
-              flippedCards={flippedCards}
-              cards={cards}
-              onAction={handleCardAction}
-              allCardsFlipped={allCardsFlipped}
-            />
-          </div>
-        )}
+        <AnimatePresence mode="wait">
+          {/* Sequence:
+              click -> shake while loading
+              loading done -> stop shake -> explode (pack exit)
+              after explosion -> show cards
+            */}
+          {/* While opening and before explosion, show shaking packs.
+              Only enter explosion branch AFTER min shake and when explicitly exploding */}
+          {isOpening && !exploding ? (
+            <motion.div key="packs-shaking" initial={{ opacity: 1 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              {Object.keys(packs).length > 0 && currentPack !== null ? (
+                <PackDisplay
+                  packs={packConfig}
+                  currentPack={currentPack}
+                  openPack={openPack}
+                  packInventory={packInventory}
+                  onOpenStore={() => setShowStore(true)}
+                  nextFreePackTime={nextFreePackTime}
+                  claimFreePack={claimFreePack}
+                  isShaking={true}
+                  openingPackType={openingPackType}
+                  exploding={false}
+                />
+              ) : (
+                <div>Loading packs...</div>
+              )}
+            </motion.div>
+          ) : isOpening && exploding && !(readyToReveal && cards.length > 0) ? (
+            <motion.div key="packs-exploding" initial={{ opacity: 1 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+              {Object.keys(packs).length > 0 && currentPack !== null ? (
+                <PackDisplay
+                  packs={packConfig}
+                  currentPack={currentPack}
+                  openPack={openPack}
+                  packInventory={packInventory}
+                  onOpenStore={() => setShowStore(true)}
+                  nextFreePackTime={nextFreePackTime}
+                  claimFreePack={claimFreePack}
+                  isShaking={false}
+                  openingPackType={openingPackType}
+                  exploding={true}
+                  onExplosionComplete={() => {
+                    setOpeningPackType(null);
+                    setExploding(false);
+                  }}
+                />
+              ) : (
+                <div>Loading packs...</div>
+              )}
+            </motion.div>
+          ) : isOpening && readyToReveal && cards.length > 0 ? (
+            <motion.div
+              key="cards"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className={`${styles.cardDisplayContainer} ${styles.cardDisplayContainerWithPadding}`}
+            >
+              <CardDisplay
+                cards={cards}
+                flippedCards={flippedCards}
+                flipCard={flipCard}
+                getAuraColor={getAuraColor}
+                animatingOut={animatingOutCards}
+              />
+              <ActionButtons
+                flippedCards={flippedCards}
+                cards={cards}
+                onAction={handleCardAction}
+                allCardsFlipped={allCardsFlipped}
+              />
+            </motion.div>
+          ) : (
+            <motion.div
+              key="packs"
+              initial={{ opacity: 1 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              {Object.keys(packs).length > 0 && currentPack !== null ? (
+                <PackDisplay
+                  packs={packConfig}
+                  currentPack={currentPack}
+                  openPack={openPack}
+                  packInventory={packInventory}
+                  onOpenStore={() => setShowStore(true)}
+                  nextFreePackTime={nextFreePackTime}
+                  claimFreePack={claimFreePack}
+                  isShaking={isLoadingCards || (!minShakeDone && isOpening && Boolean(openingPackType))}
+                  openingPackType={openingPackType}
+                  readyToReveal={readyToReveal}
+                />
+              ) : (
+                <div>Loading packs...</div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       <AnimatePresence>

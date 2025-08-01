@@ -61,13 +61,24 @@ const Card = ({ card, index, isFlipped, onFlip, getAuraColor, onPreview, animati
           animate={{ rotateY: isFlipped ? 180 : 0 }}
           transition={{ duration: 0.6 }}
         >
+          {/* BACK: for single-face cards show card back, for double-faced show the second face */}
           <div className={styles.cardBack}>
             <img
-              src="/assets/card_back.jpg"
-              alt="MTG Card Back"
+              src={card.card_faces ? (card.card_faces[1] || card.image) : "/assets/card_back.jpg"}
+              alt={card.name}
               className={styles.cardBackImage}
             />
+            {/* Optional subtle foil overlay on back face if foil */}
+            {card.foil && card.card_faces && (
+              <motion.div
+                className={styles.foilOverlay}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.6 }}
+                transition={{ duration: 0.5 }}
+              />
+            )}
           </div>
+          {/* FRONT: for double-face, show first face; otherwise card.image */}
           <motion.div
             className={styles.cardFront}
             initial={{ opacity: 0 }}
@@ -75,10 +86,9 @@ const Card = ({ card, index, isFlipped, onFlip, getAuraColor, onPreview, animati
             transition={{ duration: 0.1, delay: 0.2 }}
           >
             <img
-              src={card.image}
+              src={card.card_faces ? (card.card_faces[0] || card.image) : card.image}
               alt={card.name}
               className={styles.cardImage}
-              // onClick removed, handled by parent cardContainer
             />
             {card.foil && (
               <motion.div
@@ -91,6 +101,9 @@ const Card = ({ card, index, isFlipped, onFlip, getAuraColor, onPreview, animati
           </motion.div>
         </motion.div>
       </motion.div>
+
+      {/* Removed set/edition badge for regular-sized cards in pack view per requirements */}
+
       <motion.div
         className={styles.rarityAura}
         style={getRarityAuraStyle(card.rarity)}
@@ -191,7 +204,7 @@ const CardDisplay = ({ cards, flippedCards, flipCard, getAuraColor, animatingOut
               </button>
               <motion.div
                 style={{
-                  position: 'relative', // Needed for absolute positioning of overlay
+                  position: 'relative',
                   borderRadius: '12px',
                   boxShadow: '0 20px 40px rgba(0, 0, 0, 0.5)',
                   border: '3px solid white',
@@ -200,15 +213,16 @@ const CardDisplay = ({ cards, flippedCards, flipCard, getAuraColor, animatingOut
                 }}
               >
                 <img
-                  src={previewCard.image}
+                  src={previewCard.card_faces ? (previewCard.card_faces[0] || previewCard.image) : previewCard.image}
                   alt={previewCard.name}
                   style={{
-                    width: '100%', // Fill parent div
-                    height: '100%', // Fill parent div
-                    objectFit: 'contain', // Ensure image fits
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain',
                     borderRadius: '12px',
                   }}
                 />
+                {/* Show second face side-by-side area via click on image */}
                 {previewCard.foil && (
                   <motion.div
                     className={styles.foilOverlay}
@@ -232,7 +246,8 @@ const CardDisplay = ({ cards, flippedCards, flipCard, getAuraColor, animatingOut
                   display: 'flex',
                   gap: '20px',
                   justifyContent: 'center',
-                  alignItems: 'center'
+                  alignItems: 'center',
+                  flexWrap: 'wrap'
                 }}>
                   <span style={{
                     textTransform: 'capitalize',
@@ -241,6 +256,20 @@ const CardDisplay = ({ cards, flippedCards, flipCard, getAuraColor, animatingOut
                     borderRadius: '20px',
                     backgroundColor: 'rgba(255, 255, 255, 0.1)'
                   }}>{previewCard.rarity}</span>
+                  {previewCard.set && previewCard.setCode && (
+                    <a
+                      href={`https://scryfall.com/sets/${String(previewCard.setCode).toLowerCase()}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        color: 'white',
+                        fontWeight: 600,
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      {previewCard.set} ({String(previewCard.setCode).toUpperCase()})
+                    </a>
+                  )}
                   {previewCard.foil && <span style={{
                     display: 'inline-block',
                     background: 'linear-gradient(to right, violet, indigo, blue, green, yellow, orange, red)',
@@ -250,7 +279,7 @@ const CardDisplay = ({ cards, flippedCards, flipCard, getAuraColor, animatingOut
                     borderRadius: '20px',
                     textTransform: 'uppercase',
                     whiteSpace: 'nowrap'
-                  }}>FOIL</span>} {/* Added foil tag */}
+                  }}>FOIL</span>}
                   <span style={{
                     color: '#10b981',
                     fontWeight: '700',

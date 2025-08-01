@@ -9,26 +9,30 @@
  * Loads booster pack data from the boosters.json file.
  * @returns {Promise<Object>} An object where keys are booster codes and values are booster pack details.
  */
+import { BOOSTERS } from './data/boosters';
+
+/**
+ * Loads booster pack data from the boosters module.
+ * @returns {Promise<Object>} An object where keys are booster codes (lowercase) and values are booster pack details.
+ */
 export const loadBoosters = async () => {
   try {
-    const response = await fetch('/assets/boosters.json');
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const boostersArray = await response.json();
-    const boostersObject = boostersArray.reduce((acc, booster) => {
+    // BOOSTERS is a static array; map to the object shape used by the app
+    const boostersObject = BOOSTERS.reduce((acc, booster) => {
       acc[booster.code.toLowerCase()] = {
         name: booster.name,
-        image: `/assets/${booster.image}`, // Prepend with /assets/
+        image: `/assets/${booster.image}`,
         price: booster.price,
-        setCode: booster.code // Use 'code' as setCode for API calls
+        setCode: booster.code,
+        // expose slot config so per-pack odds/logic can be customized
+        slots: booster.slots
       };
       return acc;
     }, {});
     return boostersObject;
   } catch (error) {
     console.error('Error loading boosters:', error);
-    return {}; // Return empty object on error
+    return {};
   }
 };
 
