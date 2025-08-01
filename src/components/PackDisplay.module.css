@@ -3,18 +3,40 @@
   flex-direction: column;
   align-items: center;
   gap: 2rem;
-  margin: 5rem auto; /* Reduced top margin to move closer to the top edge */
-  max-width: 400px;
+  margin: 2rem auto;
+  width: 100%;
+  max-width: 100%;
+}
+
+.packsContainer {
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  gap: 1.5rem;
+  padding: 2rem;
+  max-width: 80vw;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.3) transparent;
+}
+
+.packsContainer::-webkit-scrollbar {
+  height: 6px;
+}
+
+.packsContainer::-webkit-scrollbar-thumb {
+  background-color: rgba(255,255,255,0.3);
+  border-radius: 3px;
 }
 
 .packDisplay {
   position: relative;
   cursor: pointer;
-  margin: 0 auto;
+  margin: 0;
+  flex: 0 0 auto;
 }
 
 .pack {
-  width: 286px; /* Adjusted to be slightly smaller for optical reasons (296px - 10px) */
+  width: 250px;
   height: auto; /* Auto height to accommodate content */
   border-radius: 0.75rem;
   position: relative;

@@ -68,16 +68,16 @@ const CountdownTimer = ({ targetTime }) => {
     const updateCountdown = () => {
       const now = new Date();
       const diff = targetTime.getTime() - now.getTime();
-      
+
       if (diff <= 0) {
         setTimeRemaining('Available now!');
         return;
       }
-      
+
       const hours = Math.floor(diff / (1000 * 60 * 60));
       const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
       const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-      
+
       if (hours > 0) {
         setTimeRemaining(`${hours}h ${minutes}m ${seconds}s`);
       } else {
@@ -87,7 +87,7 @@ const CountdownTimer = ({ targetTime }) => {
 
     updateCountdown();
     const interval = setInterval(updateCountdown, 1000);
-    
+
     return () => clearInterval(interval);
   }, [targetTime]);
 
@@ -120,16 +120,9 @@ const PackDisplay = ({ packs, currentPack, openPack, packInventory, onOpenStore,
     }
     return currentPack; // fallback to current pack
   };
-  
+
   const availablePackType = getFirstAvailablePack();
   const packConfig = packs[availablePackType];
-  const packCount = packInventory[availablePackType] || 0;
-
-  const handleOpenPack = useCallback(() => {
-    if (packConfig) { // Only open if packConfig is valid
-      openPack(availablePackType);
-    }
-  }, [openPack, availablePackType, packConfig]);
 
   const handleStoreClick = useCallback(() => {
     onOpenStore();
@@ -161,10 +154,10 @@ const PackDisplay = ({ packs, currentPack, openPack, packInventory, onOpenStore,
           onClick={handleStoreClick}
           {...containerAnimation}
         >
-            <motion.div
-              className={`${styles.pack} bg-gradient-to-br from-gray-600 to-gray-800 ${styles.packNoPacksBorder}`}
-              {...packAnimation}
-            >
+          <motion.div
+            className={`${styles.pack} bg-gradient-to-br from-gray-600 to-gray-800 ${styles.packNoPacksBorder}`}
+            {...packAnimation}
+          >
             {/* Pack label */}
             <div className={styles.label}>
               <ShoppingCart size={48} style={{ marginBottom: '0.5rem' }} />
@@ -238,62 +231,69 @@ const PackDisplay = ({ packs, currentPack, openPack, packInventory, onOpenStore,
 
   return (
     <div className={styles.packDisplayContainer}>
-      <motion.div
-        className={styles.packDisplay}
-        onClick={handleOpenPack}
-        {...containerAnimation}
-      >
-        <AnimatePresence>
-          {packConfig && ( // Only render pack if packConfig exists
+      <div className={styles.packsContainer}>
+        {Object.entries(packInventory).map(([packType, count]) => {
+          if (count <= 0) return null;
+          const config = packs[packType];
+          return (
             <motion.div
-              key={packConfig.name} // Key for AnimatePresence to track
-              className={styles.pack}
-              exit={{ opacity: 0, scale: 1.5, rotate: 360, y: -100, transition: { duration: 0.5 } }} // Explosion animation
+              key={packType}
+              className={styles.packDisplay}
+              onClick={() => openPack(packType)}
+              {...containerAnimation}
             >
-              {/* New Shine Overlay */}
-              <motion.div
-                className={styles.shine}
-              initial={{ x: '-100%' }}
-              animate={{ x: '100%' }}
-              transition={{ duration: 1.5, repeat: Infinity, ease: "linear", repeatDelay: 1 }}
-              style={{
-                maskImage: `url(${packConfig.image})`, // Use booster image as mask
-                maskMode: 'alpha', // Mask based on alpha channel
-                WebkitMaskImage: `url(${packConfig.image})`, // Webkit prefix
-                WebkitMaskMode: 'alpha', // Webkit prefix
-              }}
-            />
-            
-            {/* Booster Image */}
-            <motion.img
-              src={packConfig.image}
-              alt={packConfig.name}
-              className={styles.packImage}
-              animate={{
-                filter: [
-                  'drop-shadow(0 0 0px rgba(147, 51, 234, 0))',
-                  'drop-shadow(0 0 8px rgba(255, 255, 255, 0.5))',
-                  'drop-shadow(0 0 8px rgba(255, 255, 255, 0.5))', // Hold the shining state
-                  'drop-shadow(0 0 0px rgba(147, 51, 234, 0))'
-                ]
-              }}
-              transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", times: [0, 0.35, 0.65, 1] }} // Adjusted times for longer hold
-            />
+              <AnimatePresence>
+                <motion.div
+                  key={config.name}
+                  className={styles.pack}
+                  exit={{ opacity: 0, scale: 1.5, rotate: 360, y: -100, transition: { duration: 0.5 } }}
+                >
+                  {/* New Shine Overlay */}
+                  <motion.div
+                    className={styles.shine}
+                    initial={{ x: '-100%' }}
+                    animate={{ x: '100%' }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: "linear", repeatDelay: 1 }}
+                    style={{
+                      maskImage: `url(${packConfig.image})`, // Use booster image as mask
+                      maskMode: 'alpha', // Mask based on alpha channel
+                      WebkitMaskImage: `url(${packConfig.image})`, // Webkit prefix
+                      WebkitMaskMode: 'alpha', // Webkit prefix
+                    }}
+                  />
 
-            {/* Pack info below image */}
-            <div className={styles.packInfoContainer}>
-              <span className={styles.packName}>{packConfig.name}</span>
-              <span className={styles.cardCount}>{packCount} packs available</span>
-            </div>
+                  {/* Booster Image */}
+                  <motion.img
+                    src={config.image}
+                    alt={config.name}
+                    className={styles.packImage}
+                    animate={{
+                      filter: [
+                        'drop-shadow(0 0 0px rgba(147, 51, 234, 0))',
+                        'drop-shadow(0 0 8px rgba(255, 255, 255, 0.5))',
+                        'drop-shadow(0 0 8px rgba(255, 255, 255, 0.5))', // Hold the shining state
+                        'drop-shadow(0 0 0px rgba(147, 51, 234, 0))'
+                      ]
+                    }}
+                    transition={{ duration: 8, repeat: Infinity, ease: "easeInOut", times: [0, 0.35, 0.65, 1] }} // Adjusted times for longer hold
+                  />
 
-          {/* Sparkle effects */}
-          {Array.from({ length: 5 }).map((_, i) => ( // Render 5 SparkleAnimation components
-            <SparkleAnimation key={i} delay={i * 0.2} />
-          ))}
+                  {/* Pack info below image */}
+                  <div className={styles.packInfoContainer}>
+                    <span className={styles.packName}>{config.name}</span>
+                    <span className={styles.cardCount}>{count} packs available</span>
+                  </div>
+
+                  {/* Sparkle effects */}
+                  {Array.from({ length: 5 }).map((_, i) => ( // Render 5 SparkleAnimation components
+                    <SparkleAnimation key={i} delay={i * 0.2} />
+                  ))}
+                </motion.div>
+              </AnimatePresence>
             </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+          );
+        })}
+      </div>
 
       {/* Store Info */}
       <div className={styles.storeInfo}>
