@@ -1,0 +1,92 @@
+[
+    {
+        "name": "Aetherdrift",
+        "code": "DFT",
+        "image": "boosters/aetherdrift.png",
+        "price": 2.95
+    },
+    {
+        "name": "Bloomburrow",
+        "code": "BLB",
+        "image": "boosters/bloomburrow.png",
+        "price": 4.15
+    },
+    {
+        "name": "Dominaria United",
+        "code": "DMU",
+        "image": "boosters/dominaria_united.png",
+        "price": 4.99
+    },
+    {
+        "name": "Duskmourn: House of Horror",
+        "code": "DSK",
+        "image": "boosters/duskmourn_house_of_horror.png",
+        "price": 3.95
+    },
+    {
+        "name": "Final Fantasy",
+        "code": "FIN",
+        "image": "boosters/final_fantasy.png",
+        "price": 5.56
+    },
+    {
+        "name": "Foundations",
+        "code": "FDN",
+        "image": "boosters/foundations.png",
+        "price": 3.88
+    },
+    {
+        "name": "March of the Machine: The Aftermath",
+        "code": "MAT",
+        "image": "boosters/march_of_the_machine.png",
+        "price": 3.15
+    },
+    {
+        "name": "March of the Machine",
+        "code": "MOM",
+        "image": "boosters/march_of_the_machine.png",
+        "price": 4.30
+    },
+    {
+        "name": "Murders at Karlov Manor",
+        "code": "MKM",
+        "image": "boosters/murders_at_karlov_manor.png",
+        "price": 3.06
+    },
+    {
+        "name": "Outlaws of Thunder Junction",
+        "code": "OTJ",
+        "image": "boosters/outlaws_of_thunder_junction.png",
+        "price": 3.79
+    },
+    {
+        "name": "Phyrexia: All Will Be One",
+        "code": "ONE",
+        "image": "boosters/phyrexia_all_will_be_one.png",
+        "price": 6.12
+    },
+    {
+        "name": "Tarkir: Dragonstorm",
+        "code": "TDC",
+        "image": "boosters/tarkir_dragonstorm.png",
+        "price": 4.27
+    },
+    {
+        "name": "The Brothers' War",
+        "code": "BRO",
+        "image": "boosters/the_brothers_war.png",
+        "price": 4.44
+    },
+    {
+        "name": "The Lost Caverns of Ixalan",
+        "code": "LCI",
+        "image": "boosters/the_lost_caverns_of_ixalan.png",
+        "price": 5.03
+    },
+    {
+        "name": "Wilds of Eldraine",
+        "code": "WOE",
+        "image": "boosters/wilds_of_eldraine.png",
+        "price": 5.70
+    }
+]

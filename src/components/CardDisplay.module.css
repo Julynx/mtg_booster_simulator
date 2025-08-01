@@ -1,36 +1,42 @@
+.cardGridWrapper {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-gutter: stable;
+  padding: 4rem 2rem;
+}
+
 .cardGrid {
   display: grid;
   grid-auto-flow: column;
   grid-template-rows: repeat(2, auto);
-  gap: 1.5rem;
-  margin-bottom: 1rem;
-  overflow-x: auto; 
-  overflow-y: hidden;
-  padding: 1rem;
-  padding-bottom: 1.5rem; /* Extra space for scrollbar */
-  height: 32rem; /* Optimized for two rows within viewport */
-  width: 100%;
-  max-width: 100%;
+  gap: 2rem;
+  padding: 0 2rem;
+  width: max-content;
+  margin: 0;
 }
 
 @media (min-width: 768px) {
   .cardGrid {
-    height: 36rem; /* Larger height for desktop with bigger cards */
+    gap: 2.5rem;
   }
 }
 
-.cardGrid::-webkit-scrollbar {
-  height: 12px;
+.cardGridWrapper::-webkit-scrollbar {
+  height: 8px;
 }
 
-.cardGrid::-webkit-scrollbar-track {
+.cardGridWrapper::-webkit-scrollbar-track {
   background: rgba(0, 0, 0, 0.1);
-  border-radius: 6px;
 }
 
-.cardGrid::-webkit-scrollbar-thumb {
-  background-color: rgba(255, 255, 255, 0.4);
+.cardGridWrapper::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
   border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.cardGridWrapper::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.3);
 }
 
 .cardContainer {
@@ -75,15 +81,11 @@
   backface-visibility: hidden;
 }
 
-.cardBackContent {
-  color: white;
-  text-align: center;
-}
-
-.cardBackText {
-  font-size: 0.75rem;
-  line-height: 1rem;
-  font-weight: 700;
+.cardBackImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 0.5rem;
 }
 
 .cardFront {
@@ -104,14 +106,49 @@
   object-fit: cover;
 }
 
-.rarityAura {
+.foilOverlay {
   position: absolute;
-  top: 1rem;
-  left: 0.75rem;
-  right: 0.75rem;
-  bottom: 1rem;
-  border-radius: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    120deg,
+    #ff0000,
+    #ff7f00 10%,
+    #ffff00 20%,
+    #00ff00 30%,
+    #0000ff 40%,
+    #4b0082 50%,
+    #9400d3 60%,
+    #ff0000 70%
+  );
+  background-size: 400% 400%; /* Increased size for smoother movement */
+  animation: foil-animation 6s linear infinite; /* Increased duration for smoother loop */
+  mix-blend-mode: overlay;
+  opacity: 0; /* Start with opacity 0 */
+  pointer-events: none;
+  border-radius: 0.5rem;
+  z-index: 1;
+}
+
+@keyframes foil-animation {
+  0% { background-position: 0% 0%; opacity: 0; } /* Start faded out */
+  25% { opacity: 1; } /* Fade in */
+  75% { opacity: 1; } /* Stay visible */
+  100% { background-position: 100% 100%; opacity: 0; } /* Fade out and loop */
+}
+
+.rarityAura {
+  /* Please dont modify this, I like these values */
+  position: absolute;
+  top: 0.75rem;
+  left: 0.35rem;
+  right: 0.35rem;
+  bottom: 0.75rem;
+  border-radius: 0.5rem;
   filter: blur(0.5rem);
   z-index: -1;
-  opacity: 1;
+  opacity: 0;
+  transform: scale(0.95);
 }

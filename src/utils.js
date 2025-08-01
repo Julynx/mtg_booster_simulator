@@ -1,7 +1,36 @@
+
+
 /**
  * Utility functions for MTG Booster Simulator.
  * Provides color mappings and other helper functions.
  */
+
+/**
+ * Loads booster pack data from the boosters.json file.
+ * @returns {Promise<Object>} An object where keys are booster codes and values are booster pack details.
+ */
+export const loadBoosters = async () => {
+  try {
+    const response = await fetch('/assets/boosters.json');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const boostersArray = await response.json();
+    const boostersObject = boostersArray.reduce((acc, booster) => {
+      acc[booster.code.toLowerCase()] = {
+        name: booster.name,
+        image: `/assets/${booster.image}`, // Prepend with /assets/
+        price: booster.price,
+        setCode: booster.code // Use 'code' as setCode for API calls
+      };
+      return acc;
+    }, {});
+    return boostersObject;
+  } catch (error) {
+    console.error('Error loading boosters:', error);
+    return {}; // Return empty object on error
+  }
+};
 
 /**
  * Gets the hex color for a given card rarity.
@@ -46,4 +75,64 @@ export const getAuraColor = (rarity) => {
 export const isValidRarity = (rarity) => {
   const validRarities = ['common', 'uncommon', 'rare', 'mythic'];
   return validRarities.includes(rarity);
+};
+
+/**
+ * Validates card data structure.
+ * @param {object} card - The card object to validate
+ * @returns {boolean} Whether the card is valid
+ */
+export const validateCard = (card) => {
+  if (!card) return false;
+  if (typeof card.id === 'undefined') return false;
+  if (!card.name || typeof card.name !== 'string') return false;
+  if (!card.rarity || typeof card.rarity !== 'string') return false;
+  if (!card.image || typeof card.image !== 'string') return false;
+  return true;
+};
+
+/**
+ * Generates a new set of cards with random rarities (fallback for when API fails).
+ * @param {number} count - Number of cards to generate
+ * @returns {Array<object>} An array of card objects.
+ */
+export const generateCards = () => { // No count parameter needed, fixed to 14
+  const cards = [];
+  let cardIdCounter = 0;
+
+  const createPlaceholderCard = (rarity, isFoil = false, type = 'creature') => {
+    const id = `generated_${cardIdCounter++}_${Date.now()}`; // Ensure unique ID
+    const name = `${rarity.charAt(0).toUpperCase() + rarity.slice(1)} ${type.charAt(0).toUpperCase() + type.slice(1)} Card ${cardIdCounter}`;
+    const image = `https://placehold.co/200x280/${getRarityColor(rarity).replace('#', '')}/ffffff?text=${rarity.charAt(0).toUpperCase()}${isFoil ? 'F' : ''}`;
+    return { id, name, rarity, image, foil: isFoil, type };
+  };
+
+  // 7 Common cards
+  for (let i = 0; i < 7; i++) {
+    cards.push(createPlaceholderCard('common'));
+  }
+
+  // 3 Uncommon cards
+  for (let i = 0; i < 3; i++) {
+    cards.push(createPlaceholderCard('uncommon'));
+  }
+
+  // 1 Rare or Mythic Rare
+  const isMythic = Math.random() < (1 / 7); // 1 in 7 chance for mythic
+  cards.push(createPlaceholderCard(isMythic ? 'mythic' : 'rare'));
+
+  // 1 Land (20% chance of being foil)
+  const isLandFoil = Math.random() < 0.2;
+  cards.push(createPlaceholderCard('common', isLandFoil, 'land')); // Lands are typically common
+
+  // 1 Non-foil wildcard (any rarity)
+  const randomRarities = ['common', 'uncommon', 'rare', 'mythic'];
+  const randomRarityNonFoil = randomRarities[Math.floor(Math.random() * randomRarities.length)];
+  cards.push(createPlaceholderCard(randomRarityNonFoil, false, 'wildcard'));
+
+  // 1 Foil wildcard (any rarity)
+  const randomRarityFoil = randomRarities[Math.floor(Math.random() * randomRarities.length)];
+  cards.push(createPlaceholderCard(randomRarityFoil, true, 'wildcard'));
+
+  return cards;
 };

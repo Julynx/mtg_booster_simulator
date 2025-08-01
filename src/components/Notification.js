@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React, { useState, useEffect, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react';
 import styles from './Notification.module.css';
 
@@ -16,20 +16,20 @@ import styles from './Notification.module.css';
 const Notification = ({ message, type = 'info', duration = 3000, onClose, id }) => {
   const [isVisible, setIsVisible] = useState(true);
 
+  const handleClose = useCallback(() => {
+    setIsVisible(false);
+    if (onClose) {
+      setTimeout(() => onClose(id), 300); // Wait for animation to complete
+    }
+  }, [onClose, id]);
+
   useEffect(() => {
     const timer = setTimeout(() => {
       handleClose();
     }, duration);
 
     return () => clearTimeout(timer);
-  }, [duration]);
-
-  const handleClose = () => {
-    setIsVisible(false);
-    if (onClose) {
-      setTimeout(() => onClose(id), 300); // Wait for animation to complete
-    }
-  };
+  }, [duration, handleClose]);
 
   const getIcon = () => {
     switch (type) {

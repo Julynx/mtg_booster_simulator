@@ -3,7 +3,7 @@
   flex-direction: column;
   align-items: center;
   gap: 2rem;
-  margin: 2rem auto;
+  margin: 5rem auto; /* Reduced top margin to move closer to the top edge */
   max-width: 400px;
 }
 
@@ -14,35 +14,36 @@
 }
 
 .pack {
-  width: 12rem;
-  height: 16rem;
+  width: 286px; /* Adjusted to be slightly smaller for optical reasons (296px - 10px) */
+  height: auto; /* Auto height to accommodate content */
   border-radius: 0.75rem;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   position: relative;
   overflow: hidden;
+  display: flex;
+  flex-direction: column; /* Stack image and info vertically */
+  align-items: center;
+  justify-content: center;
+  padding-bottom: 1rem; /* Add padding for text below */
 }
 
-.shine {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-image: linear-gradient(to right, transparent, white, transparent);
-  opacity: 0.2;
+.packImage {
+  width: 100%; /* Fill container width */
+  height: auto; /* Maintain aspect ratio */
+  max-height: 25rem; /* Max height for the image */
+  object-fit: contain;
+  border-radius: 0.75rem;
+  margin-top: 1rem; /* Space between image and info */
+  margin-bottom: 1rem; /* Space between image and info */
 }
 
-.label {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+
+.packInfoContainer {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   color: white;
+  text-align: center;
+  padding: 0 1rem; /* Add horizontal padding */
 }
 
 .packName {
@@ -61,8 +62,14 @@
 
 .sparkle {
   position: absolute;
-  color: #fef08a;
+  /* color: #fef08a; Removed default color */
 }
+
+.packNoPacksBorder {
+  border: 2px solid rgba(255, 255, 255, 0.5); /* Example border style */
+  background-color: rgba(255, 255, 255, 0.15); /* Added subtle background color */
+}
+
 
 .storeInfo {
   display: flex;
@@ -95,4 +102,14 @@
 
 .freePackText {
   color: #fbbf24;
+}
+
+.label {
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  text-align: center;
 }

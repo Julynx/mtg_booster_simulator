@@ -12,21 +12,32 @@ A React-based Magic: The Gathering booster pack simulator that allows users to e
 - **Animated UI**: Smooth animations and visual effects using Framer Motion
 - **Responsive Design**: Works on desktop and mobile devices
 
+## Recent Updates (July 2025)
+
+- **Store UI**: Fixed a visual bug that showed a duplicate dollar sign in the balance display.
+- **Card Grid**:
+  - Unflipped cards now have a hover glow effect.
+  - The "Collect Cards" button now automatically flips all remaining cards before adding them to the collection.
+- **Collection View**:
+  - Redesigned the grid to have fewer columns and larger card images for better readability.
+  - Fixed a bug where double-sided cards would not display correctly. You can now flip them in the preview modal.
+  - Improved performance by preventing the entire grid from re-rendering when a card is sold.
+- **Free Pack Timer**:
+  - Implemented a fully functional countdown timer for free packs.
+  - The app now correctly calculates and awards free packs that were earned while the user was offline.
+  - **Note**: The timer is currently set to 2 minutes for testing purposes.
+
 ## Project Structure
 
 ```
 src/
 ├── components/          # React components
-│   ├── ActionButtons.js # Collection and reset controls
-│   ├── BackgroundParticles.js # Animated background effects
-│   ├── CardDisplay.js   # Card grid and flipping mechanics
-│   ├── Collection.js    # Collection modal and display
-│   ├── Header.js        # Application header
-│   ├── PackDisplay.js   # Interactive booster pack
-│   └── PackSelector.js # Pack type selector
-├── utils.js             # Utility functions and color mappings
+│   ├── ...
+├── config.js            # Application configuration constants
+├── utils.js             # Utility functions
+├── mtg-api.js           # Scryfall API fetching logic
 ├── App.js               # Main application component
-└── App.module.css       # Main application styles
+└── index.js             # Entry point
 ```
 
 ## Refactored Improvements
@@ -52,10 +63,10 @@ src/
    - Implemented proper key props for list rendering
 
 4. **Better Maintainability**:
-   - Extracted configuration constants for easy modification
-   - Created reusable utility functions
-   - Separated concerns with clear component responsibilities
-   - Added comprehensive documentation
+   - Extracted all configuration constants into a dedicated `src/config.js` file.
+   - Centralized all general helper functions in `src/utils.js`.
+   - Separated concerns with clear component responsibilities.
+   - Added comprehensive documentation.
 
 ### Key Components
 
@@ -85,10 +96,11 @@ Creates animated background effects with:
 ### Utility Functions
 
 The `utils.js` file provides:
-- `getRarityColor`: Maps rarities to hex colors
-- `getAuraColor`: Maps rarities to rgba colors for effects
-- `isValidRarity`: Validates rarity strings
-- Proper fallback mechanisms for invalid inputs
+- `getRarityColor`: Maps rarities to hex colors.
+- `getAuraColor`: Maps rarities to rgba colors for effects.
+- `isValidRarity`: Validates rarity strings.
+- `validateCard`: Validates the structure of a card object.
+- `generateCards`: Generates placeholder cards as a fallback.
 
 ## Getting Started
 

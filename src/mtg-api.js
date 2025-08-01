@@ -62,80 +62,107 @@ export const fetchCardsBySet = async (setCode, count = 15) => {
  * @returns {Promise<Array>} Array of 15 cards representing a booster pack
  */
 export const fetchBoosterPack = async (setCode) => {
-  try {
-    console.log(`Fetching booster pack for set: ${setCode}`);
-    
-    // Generate completely fresh random cards each time to ensure true randomness
-    console.log('Generating fresh random booster pack...');
-    
-    // Fetch a completely random booster pack using the random card endpoint
-    const cards = [];
-    const totalCards = 15;
-    
-    // Define booster pack distribution (typical MTG booster)
-    const cardDistribution = {
-      common: 10,
-      uncommon: 3,
-      rare: 1,
-      mythic: 1
-    };
-    
-    // Fetch cards for each rarity
-    for (const [rarity, count] of Object.entries(cardDistribution)) {
-      for (let i = 0; i < count; i++) {
-        try {
-          // Fetch a random card from the specific set with the required rarity
-          const response = await fetch(`https://api.scryfall.com/cards/random?q=set:${setCode} rarity:${rarity}`);
-          const card = await response.json();
-          if (card) {
-            cards.push(card);
-            console.log(`Added ${rarity} card: ${card.name}`);
-          }
-        } catch (error) {
-          console.warn(`Failed to fetch random ${rarity} card, trying generic random card...`, error);
-          // Fallback to completely random card
-          const randomCard = await fetchRandomCard();
-          if (randomCard) {
-            cards.push(randomCard);
-          }
-        }
+  const rawCards = [];
+  const foilStatuses = []; // To store the intended foil status for each card
+
+  // Helper to fetch a raw card with specific rarity, foil status, and type
+  // This helper will now return the raw Scryfall card object
+  const fetchRawCard = async (rarity, queryFoil = null, type = null) => {
+    let query = `set:${setCode}`;
+    if (rarity) query += ` rarity:${rarity}`;
+    if (type) query += ` type:${type}`;
+    if (queryFoil === true) query += ` is:foil`;
+    if (queryFoil === false) query += ` is:nonfoil`;
+
+    try {
+      const response = await fetch(`https://api.scryfall.com/cards/random?q=${query}`);
+      const card = await response.json();
+      if (card && card.object !== 'error') {
+        return card;
       }
+    } catch (error) {
+      console.warn(`Failed to fetch raw card with query "${query}":`, error);
     }
-    
-    // Format all cards
-    let formattedCards = cards.map(formatCardData).filter(card => card !== null);
-    console.log('Formatted cards:', formattedCards.length);
-    
-    // Ensure we have exactly 15 cards (pad with more random cards if needed)
-    if (formattedCards.length < 15) {
-      const needed = 15 - formattedCards.length;
-      console.log(`Need ${needed} more cards, fetching additional random cards...`);
-      for (let i = 0; i < needed; i++) {
-        const randomCard = await fetchRandomCard();
-        if (randomCard) {
-          formattedCards.push(randomCard);
-        }
-      }
+    // Fallback to generic random card if specific fetch fails
+    const randomCardResponse = await fetch('https://api.scryfall.com/cards/random');
+    const randomCard = await randomCardResponse.json();
+    if (randomCard && randomCard.object !== 'error') {
+      return randomCard;
     }
-    
-    // Ensure we have exactly 15 cards (trim if too many)
-    formattedCards = formattedCards.slice(0, 15);
-    
-    console.log('Returning formatted cards:', formattedCards);
-    return formattedCards;
-  } catch (error) {
-    console.error(`Error fetching booster pack for set ${setCode}:`, error);
-    // Fallback to fetching individual cards
-    return fetchCardsBySet(setCode, 15);
+    return null;
+  };
+
+  // 7 Common cards
+  for (let i = 0; i < 7; i++) {
+    rawCards.push(await fetchRawCard('common'));
+    foilStatuses.push(false); // Commons are non-foil
   }
+
+  // 3 Uncommon cards
+  for (let i = 0; i < 3; i++) {
+    rawCards.push(await fetchRawCard('uncommon'));
+    foilStatuses.push(false); // Uncommons are non-foil
+  }
+
+  // 1 Rare or Mythic Rare
+  const isMythic = Math.random() < (1 / 7);
+  rawCards.push(await fetchRawCard(isMythic ? 'mythic' : 'rare'));
+  foilStatuses.push(false); // Rare/Mythic slot is non-foil by default
+
+  // 1 Land (20% chance of being foil)
+  const isLandFoil = Math.random() < 0.2;
+  rawCards.push(await fetchRawCard(null, isLandFoil, 'basic'));
+  foilStatuses.push(isLandFoil);
+
+  // 1 Non-foil wildcard (any rarity)
+  rawCards.push(await fetchRawCard(null, false));
+  foilStatuses.push(false);
+
+  // 1 Foil wildcard (any rarity)
+  rawCards.push(await fetchRawCard(null, true));
+  foilStatuses.push(true);
+
+  // Filter out any nulls from failed fetches and ensure 14 cards
+  let finalFormattedCards = [];
+  for (let i = 0; i < rawCards.length; i++) {
+    if (rawCards[i]) {
+      finalFormattedCards.push(formatCardData(rawCards[i], foilStatuses[i]));
+    }
+  }
+
+  // Pad with random cards if less than 14 (shouldn't happen often with fallbacks)
+  while (finalFormattedCards.length < 14) {
+    // For padding, just fetch a random card and assume non-foil
+    const randomCardResponse = await fetch('https://api.scryfall.com/cards/random');
+    const randomCard = await randomCardResponse.json();
+    if (randomCard && randomCard.object !== 'error') {
+      finalFormattedCards.push(formatCardData(randomCard, false));
+    } else {
+      // If even random fails, use a placeholder
+      finalFormattedCards.push({
+        id: `placeholder_${Date.now()}_${Math.random()}`,
+        name: 'Placeholder Card',
+        rarity: 'common',
+        image: 'https://placehold.co/200x280/cccccc/000000?text=Error',
+        foil: false,
+        type: 'unknown'
+      });
+    }
+  }
+
+  // Trim to exactly 14 cards
+  finalFormattedCards = finalFormattedCards.slice(0, 14);
+
+  return finalFormattedCards;
 };
 
 /**
  * Formats Scryfall card data to match our application's expected structure
  * @param {Object} card - Raw card data from Scryfall API
+ * @param {boolean} explicitFoil - Optional: Force the foil status of the card
  * @returns {Object} Formatted card object
  */
-const formatCardData = (card) => {
+const formatCardData = (card, explicitFoil = null) => {
   if (!card) return null;
   
   // Determine rarity (Scryfall uses different terms)
@@ -162,7 +189,17 @@ const formatCardData = (card) => {
   
   // Get image URL (prefer normal size, fallback to large)
   let imageUrl = '';
-  if (card.image_uris) {
+  let cardFaces = null;
+
+  if (card.card_faces && card.card_faces.length === 2 && card.card_faces[0].image_uris && card.card_faces[1].image_uris) {
+    // Handle double-sided cards
+    imageUrl = card.card_faces[0].image_uris.normal || card.card_faces[0].image_uris.large;
+    cardFaces = [
+      card.card_faces[0].image_uris.normal || card.card_faces[0].image_uris.large,
+      card.card_faces[1].image_uris.normal || card.card_faces[1].image_uris.large
+    ];
+  } else if (card.image_uris) {
+    // Handle single-faced cards
     imageUrl = card.image_uris.normal || card.image_uris.large || card.image_uris.small || '';
   }
   
@@ -187,11 +224,13 @@ const formatCardData = (card) => {
     name: card.name || 'Unknown Card',
     rarity: rarity,
     image: imageUrl,
+    card_faces: cardFaces,
     price: price,
     type: card.type_line || 'Unknown',
     set: card.set_name || 'Unknown Set',
+    setCode: card.set || 'Unknown', // Add setCode to formatted card data
     collectorNumber: card.collector_number || '',
-    foil: card.foil || false
+    foil: explicitFoil !== null ? explicitFoil : (card.foil || false)
   };
 };
 

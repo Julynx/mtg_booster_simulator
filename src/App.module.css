@@ -10,7 +10,7 @@
 .mainContent {
   flex: 1;
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* Changed to flex-start to align content to the top */
   justify-content: center;
   padding: 0 1rem;
   position: relative;
@@ -25,4 +25,49 @@
   align-items: center;
   width: 100%;
   height: 100%;
+}
+
+.cardDisplayContainerWithPadding {
+  padding: 2rem 0;
+}
+
+/* Store Button Styles */
+.storeButtonContainer {
+  position: fixed;
+  top: 2rem;
+  right: 2rem;
+  z-index: 1000;
+}
+
+.storeButton {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  border-radius: 50%;
+  width: 60px;
+  height: 60px;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.storeButton:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+.moneyDisplay {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #ff6b6b;
+  border-radius: 12px;
+  padding: 2px 6px;
+  font-size: 12px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  gap: 2px;
 }

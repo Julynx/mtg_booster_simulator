@@ -9,15 +9,17 @@ import styles from './ActionButtons.module.css';
  * @param {Object} props - Component props
  * @param {Set} props.flippedCards - Set of card IDs that are currently flipped
  * @param {Array} props.cards - Array of current cards
- * @param {Function} props.collectCards - Function to collect all cards
+ * @param {Function} props.onAction - Function to handle button click (either reveal or collect)
+ * @param {boolean} props.allCardsFlipped - True if all cards are flipped, false otherwise
  * @returns {JSX.Element} The rendered action buttons component
  */
-const ActionButtons = ({ flippedCards, cards, collectCards }) => {
-  const handleCollectCards = useCallback(() => {
-    collectCards();
-  }, [collectCards]);
+const ActionButtons = ({ flippedCards, cards, onAction, allCardsFlipped }) => {
+  const buttonText = allCardsFlipped ? 'Continue' : 'Reveal All Cards';
+  const actionType = allCardsFlipped ? 'collect' : 'reveal';
 
-  const allCardsFlipped = flippedCards.size === cards.length && cards.length > 0;
+  const handleButtonClick = useCallback(() => {
+    onAction(actionType);
+  }, [onAction, actionType]);
 
   const containerAnimation = {
     initial: { opacity: 0, y: 20 },
@@ -35,16 +37,14 @@ const ActionButtons = ({ flippedCards, cards, collectCards }) => {
       className={styles.actionButtons}
       {...containerAnimation}
     >
-      {allCardsFlipped && (
-        <motion.button
-          className={`${styles.button} ${styles.collectButton}`}
-          {...buttonAnimation}
-          onClick={handleCollectCards}
-        >
-          <Trophy className={styles.icon} size={20} />
-          Collect Cards
-        </motion.button>
-      )}
+      <motion.button
+        className={`${styles.button} ${styles.collectButton}`}
+        {...buttonAnimation}
+        onClick={handleButtonClick}
+      >
+        <Trophy className={styles.icon} size={20} />
+        {buttonText}
+      </motion.button>
     </motion.div>
   );
 };
