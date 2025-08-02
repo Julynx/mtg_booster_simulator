@@ -357,7 +357,7 @@ const AppContent = () => {
       if (!newSet.has(cardId)) {
         newSet.add(cardId);
         // Play sound only on first flip
-        const flipSound = new Audio('/assets/flash1.wav');
+        const flipSound = new Audio(`${process.env.PUBLIC_URL}/assets/flash1.wav`);
         const rarityPitchMap = {
           'common': 1,
           'uncommon': 0.9,

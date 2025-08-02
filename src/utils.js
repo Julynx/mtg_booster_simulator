@@ -21,7 +21,7 @@ export const loadBoosters = async () => {
     const boostersObject = BOOSTERS.reduce((acc, booster) => {
       acc[booster.code.toLowerCase()] = {
         name: booster.name,
-        image: `/assets/${booster.image}`,
+        image: `${process.env.PUBLIC_URL}/assets/${booster.image}`,
         price: booster.price,
         setCode: booster.code,
         // expose slot config so per-pack odds/logic can be customized

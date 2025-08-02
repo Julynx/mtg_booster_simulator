@@ -9,7 +9,7 @@ const PackOpeningScreen = ({ packConfig, onAnimationComplete, triggerExplosion }
 
   useEffect(() => {
     if (packConfig) {
-      const openingSound = new Audio('/assets/flash3.wav');
+      const openingSound = new Audio(`${process.env.PUBLIC_URL}/assets/flash3.wav`);
       openingSound.volume = 0.7;
       openingSound.playbackRate = 0.9;
       openingSound.play().catch(e => console.error("Error playing pack opening sound:", e));
@@ -22,7 +22,7 @@ const PackOpeningScreen = ({ packConfig, onAnimationComplete, triggerExplosion }
       setAnimationPhase('exploding');
       setShowFlash(true);
       // Play explosion sound
-      const explosionSound = new Audio('/assets/flash2.wav');
+      const explosionSound = new Audio(`${process.env.PUBLIC_URL}/assets/flash2.wav`);
       explosionSound.volume = 0.5;
       explosionSound.playbackRate = 1.4;
       explosionSound.play().catch(e => console.error("Error playing explosion sound:", e));
