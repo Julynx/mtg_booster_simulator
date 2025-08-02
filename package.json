@@ -1,7 +1,7 @@
 {
   "name": "mtg-app",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "homepage": "https://Julynx.github.io/mtg_booster_simulator",
   "dependencies": {
     "@testing-library/dom": "^10.4.1",
