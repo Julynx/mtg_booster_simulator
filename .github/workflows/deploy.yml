@@ -33,6 +33,7 @@ jobs:
       - name: Build
         env:
           CI: false
+          PUBLIC_URL: /mtg_booster_simulator
         run: npm run build
 
       - name: Upload artifact
