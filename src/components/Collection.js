@@ -113,6 +113,7 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
         case 'rarity': return a.rarity.localeCompare(b.rarity);
         case 'price': return (b.price || 0) - (a.price || 0);
         case 'set': return (a.set || '').localeCompare(b.set || '');
+        case 'dateObtained': return (b.dateObtained || 0) - (a.dateObtained || 0); // Sort by date obtained (newest first)
         default: return 0;
       }
     });
@@ -314,6 +315,7 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
                       <option value="rarity">Rarity</option>
                       <option value="price">Price</option>
                       <option value="set">Set</option>
+                      <option value="dateObtained">Date Obtained</option>
                     </select>
                   </div>
                   <div className={styles.filterGroup}>
@@ -366,18 +368,18 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
 
       <AnimatePresence>
         {previewCard && (
-          <motion.div className={styles.previewOverlay} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={closePreview}>
-            <motion.div className={styles.previewContent} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }} onClick={(e) => e.stopPropagation()}>
-              <button className={styles.previewCloseButton} onClick={closePreview}><X size={24} /></button>
+          <motion.div className={cardDisplayStyles.previewOverlay} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={closePreview}>
+            <motion.div className={cardDisplayStyles.previewContent} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }} onClick={(e) => e.stopPropagation()}>
+              <button className={cardDisplayStyles.previewCloseButton} onClick={closePreview}><X size={24} /></button>
               <motion.div
-                className={styles.previewImageWrapper}
+                className={cardDisplayStyles.previewImageWrapper}
                 onClick={() => previewCard.card_faces && setPreviewFace(prev => 1 - prev)}
                 animate={{ rotateY: previewFace === 1 ? 180 : 0 }}
                 transition={{ duration: 0.5 }}
                 style={{ perspective: '1200px', transformStyle: 'preserve-3d' }}
               >
-                <img src={previewCard.card_faces ? previewCard.card_faces[0] : previewCard.image} alt={previewCard.name} className={styles.previewImage} style={{ backfaceVisibility: 'hidden' }} />
-                {previewCard.card_faces && <img src={previewCard.card_faces[1]} alt={previewCard.name} className={styles.previewImage} style={{ position: 'absolute', top: 0, left: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }} />}
+                <img src={previewCard.card_faces ? previewCard.card_faces[0] : previewCard.image} alt={previewCard.name} className={cardDisplayStyles.previewImage} style={{ backfaceVisibility: 'hidden' }} />
+                {previewCard.card_faces && <img src={previewCard.card_faces[1]} alt={previewCard.name} className={cardDisplayStyles.previewImage} style={{ position: 'absolute', top: 0, left: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }} />}
                 {previewCard.foil && (
                   <motion.div
                     className={cardDisplayStyles.foilOverlay}
@@ -387,31 +389,22 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
                   />
                 )}
               </motion.div>
-                <div className={styles.previewInfo}>
-                  <h3 className={styles.previewName}>{previewCard.name}</h3>
-                  <div className={styles.previewDetails}>
-                    <span className={styles.previewRarity}>{previewCard.rarity}</span>
+                <div className={cardDisplayStyles.previewInfo}>
+                  <h3 className={cardDisplayStyles.previewName}>{previewCard.name}</h3>
+                  <div className={cardDisplayStyles.previewDetails}>
+                    <span className={cardDisplayStyles.previewRarity}>{previewCard.rarity}</span>
                     {previewCard.set && previewCard.setCode && (
                       <a
                         href={`https://scryfall.com/sets/${previewCard.setCode.toLowerCase()}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className={styles.cardSetLink}
+                        className={cardDisplayStyles.cardSetLink}
                       >
                         {previewCard.set}
                       </a>
                     )}
-                    {previewCard.foil && <span style={{
-                    display: 'inline-block',
-                    background: 'linear-gradient(to right, violet, indigo, blue, green, yellow, orange, red)',
-                    color: 'white',
-                    fontWeight: '600',
-                    padding: '4px 12px',
-                    borderRadius: '20px',
-                    textTransform: 'uppercase',
-                    whiteSpace: 'nowrap'
-                  }}>FOIL</span>} {/* Added foil tag */}
-                  <span className={styles.previewPrice}>${previewCard.price ? previewCard.price.toFixed(2) : '0.10'}</span>
+                    {previewCard.foil && <span className={cardDisplayStyles.foilTag}>FOIL</span>}
+                  <span className={cardDisplayStyles.previewPrice}>${previewCard.price ? previewCard.price.toFixed(2) : '0.10'}</span>
                 </div>
               </div>
             </motion.div>

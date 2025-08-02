@@ -15,6 +15,5 @@
 
 POST DEPLOYMENT
 
-- [ ] Add sound effects to opening a booster and flipping cards
 - [ ] Include one random non playable card in all card packs. Use the request structure: curl -X GET "https://api.scryfall.com/cards/random?q=set:BOS+(layout:token+OR+layout:emblem+OR+layout:art_series)", but replacing BOS with the set code for the pack. If the set has no non playable cards (request returns 404 or similar), this can be skipped safely.
 

@@ -27,6 +27,24 @@
   object-fit: contain;
 }
 
+.flashEffect {
+  position: absolute;
+  width: 400px; /* Initial size, will scale up */
+  height: 400px; /* Initial size, will scale up */
+  background-color: rgba(255, 255, 255, 0.8); /* White flash */
+  border-radius: 50%;
+  z-index: 1000; /* Below particles, above pack image */
+  filter: blur(20px); /* Soften the flash */
+}
+
+.particle {
+  position: absolute;
+  background-color: white; /* White particles */
+  border-radius: 50%;
+  /* Size is set inline in JS */
+  /* Position is set inline in JS via framer-motion */
+}
+
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }

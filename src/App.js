@@ -26,7 +26,7 @@ const AppContent = () => {
   // Simplified animation states
   const [isOpening, setIsOpening] = useState(false); // Whether we're in the opening sequence
   const [openingPackType, setOpeningPackType] = useState(null); // Which pack is currently opening
-  const [animationPhase, setAnimationPhase] = useState('idle'); // 'idle', 'shaking', 'exploding', 'cards'
+  const [, setAnimationPhase] = useState('idle'); // 'idle', 'shaking', 'exploding', 'cards'
   const [isLoading, setIsLoading] = useState(false); // New state for global loading overlay
   const [triggerPackExplosion, setTriggerPackExplosion] = useState(false); // New state to trigger explosion
   const [cards, setCards] = useState([]);
@@ -98,7 +98,7 @@ const AppContent = () => {
       const loadedPacks = await loadBoosters();
       console.log('Loaded packs:', loadedPacks);
       setPacks(loadedPacks);
-      
+
       // Set initial currentPack to the first available pack
       const firstPackCode = Object.keys(loadedPacks)[0];
       if (firstPackCode) {
@@ -115,7 +115,7 @@ const AppContent = () => {
   useEffect(() => {
     const savedMoney = localStorage.getItem('mtgMoney');
     const savedLastFreePack = localStorage.getItem('mtgLastFreePack');
-    
+
     if (savedMoney) {
       try {
         setMoney(parseFloat(savedMoney));
@@ -123,7 +123,7 @@ const AppContent = () => {
         console.error('Error loading money from localStorage:', error);
       }
     }
-    
+
     if (savedLastFreePack) {
       try {
         const lastFreePackTime = new Date(savedLastFreePack);
@@ -212,12 +212,12 @@ const AppContent = () => {
       return false;
     }
     const randomPackType = packTypes[Math.floor(Math.random() * packTypes.length)];
-    
+
     setPackInventory(prev => ({
       ...prev,
       [randomPackType]: (prev[randomPackType] || 0) + 1
     }));
-    
+
     setLastFreePack(now);
     addNotification({
       message: `A free ${packs[randomPackType]?.name || 'random'} pack has been added to your inventory!`,
@@ -274,17 +274,17 @@ const AppContent = () => {
     setOpeningPackType(packType);
     setCards([]);
     setFlippedCards(new Set());
-    
+
     // Use the pack from inventory
     setPackInventory(prev => ({
       ...prev,
       [packType]: Math.max(0, (prev[packType] || 0) - 1)
     }));
-    
+
     try {
       console.log('Opening pack for set:', packType);
       const packConfig = packs[packType];
-      
+
       // Fetch cards
       let fetchedCards;
       if (Array.isArray(packConfig.slots) && packConfig.slots.length > 0) {
@@ -292,31 +292,37 @@ const AppContent = () => {
       } else {
         fetchedCards = await fetchBoosterPack(packConfig.setCode);
       }
-      
+
       // Process cards - fail loudly if no valid cards
       if (!fetchedCards || fetchedCards.length === 0) {
         throw new Error('No cards returned from API');
       }
-      
+
       const validCards = fetchedCards.filter(card => card && card.name && card.image);
       if (validCards.length === 0) {
         throw new Error('No valid cards returned from API');
       }
       
       // Add cards to collection
+      const now = Date.now(); // Get current timestamp in Unix milliseconds
+      const cardsWithTimestamp = validCards.map(card => ({
+        ...card,
+        dateObtained: now // Add dateObtained property
+      }));
+
       setCollection(prev => {
         const remainingSpace = APP_CONFIG.maxCollectionSize - prev.length;
-        const toAdd = remainingSpace >= validCards.length ? validCards : validCards.slice(0, Math.max(0, remainingSpace));
+        const toAdd = remainingSpace >= cardsWithTimestamp.length ? cardsWithTimestamp : cardsWithTimestamp.slice(0, Math.max(0, remainingSpace));
         return remainingSpace > 0 ? [...prev, ...toAdd] : prev;
       });
       
-      setPendingOpenedIds(validCards.map(c => c.id));
-      setCards(validCards);
-      
+      setPendingOpenedIds(cardsWithTimestamp.map(c => c.id)); // Use cardsWithTimestamp here
+      setCards(cardsWithTimestamp); // Use cardsWithTimestamp here
+
       // Show cards immediately after fetching
       setAnimationPhase('cards');
       setTriggerPackExplosion(true); // Trigger explosion in PackOpeningScreen
-      
+
     } catch (error) {
       console.error('Error opening pack:', error);
       addNotification({
@@ -324,7 +330,7 @@ const AppContent = () => {
         type: 'error',
         duration: 5000
       });
-      
+
       // Reset animation states
       setIsOpening(false);
       setOpeningPackType(null);
@@ -332,7 +338,7 @@ const AppContent = () => {
       setIsLoading(false); // End loading on error
       setTriggerPackExplosion(false); // Reset explosion trigger on error
     }
-  }, [currentPack, packInventory, addNotification, packs]);
+  }, [currentPack, packInventory, addNotification, packs, setAnimationPhase]);
 
   const handlePackOpeningAnimationComplete = useCallback(() => {
     setIsLoading(false); // End loading when PackOpeningScreen animation is complete
@@ -342,14 +348,28 @@ const AppContent = () => {
   /**
    * Flips a card to reveal its face.
    * @param {number} cardId The ID of the card to flip.
+   * @param {string} rarity The rarity of the card.
    */
-  const flipCard = useCallback((cardId) => {
+  const flipCard = useCallback((cardId, rarity) => {
     setFlippedCards(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(cardId)) {
-        newSet.delete(cardId);
-      } else {
+      // Only add to set if not already present (flip once)
+      if (!newSet.has(cardId)) {
         newSet.add(cardId);
+        // Play sound only on first flip
+        const flipSound = new Audio('/assets/flash1.wav');
+        const rarityPitchMap = {
+          'common': 1,
+          'uncommon': 0.9,
+          'rare': 0.7,
+          'mythic': 0.5,
+          'special': 1.6,
+          'bonus': 1.8
+        };
+        const pitch = rarityPitchMap[rarity] || 1.0; // Default to 1.0 if rarity not found
+        flipSound.playbackRate = pitch;
+        flipSound.preservesPitch = false;
+        flipSound.play().catch(e => console.error("Error playing flip sound:", e));
       }
       return newSet;
     });
@@ -361,8 +381,12 @@ const AppContent = () => {
    */
   const handleCardAction = useCallback((actionType) => {
     if (actionType === 'reveal') {
-      const allCardIds = new Set(cards.map(c => c.id));
-      setFlippedCards(allCardIds);
+      // Iterate through cards and flip unflipped ones, playing sound for each
+      cards.forEach(card => {
+        if (!flippedCards.has(card.id)) {
+          flipCard(card.id, card.rarity);
+        }
+      });
     } else if (actionType === 'collect') {
       setAnimatingOutCards(true); // Trigger exit animation
 
@@ -374,13 +398,13 @@ const AppContent = () => {
         setAnimationPhase('idle');
         setOpeningPackType(null);
         setIsLoading(false); // Ensure loading is false when returning to idle
-        
+
         // Clear pending opened marker
-        setPendingOpenedIds([]);
-        localStorage.removeItem('mtgPendingOpenedCards');
-      }, 600);
-    }
-  }, [cards]);
+      setPendingOpenedIds([]);
+      localStorage.removeItem('mtgPendingOpenedCards');
+    }, 600);
+  }
+}, [cards, setAnimationPhase, flipCard, flippedCards]);
 
 
 
@@ -511,7 +535,11 @@ const AppContent = () => {
       <footer className={styles.legalDisclaimer}>
         <p>All currency used within this simulation is entirely fictional and holds no real-world monetary value. All products presented are simulated and do not represent or replicate real-world goods. All referenced items, including card designs, names, and intellectual property, are the copyrighted property of Wizards of the Coast and Hasbro. This simulation is a fan-created experience and is not affiliated with, endorsed by, or associated with Wizards of the Coast or Hasbro.</p>
       </footer>
-      {isLoading && <PackOpeningScreen packConfig={packs[openingPackType]} onAnimationComplete={handlePackOpeningAnimationComplete} triggerExplosion={triggerPackExplosion} />} {/* Conditionally render PackOpeningScreen with packConfig */}
+      <AnimatePresence>
+        {isLoading && (
+          <PackOpeningScreen packConfig={packs[openingPackType]} onAnimationComplete={handlePackOpeningAnimationComplete} triggerExplosion={triggerPackExplosion} />
+        )}
+      </AnimatePresence>
     </div>
   );
 };
