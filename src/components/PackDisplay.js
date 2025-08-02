@@ -200,6 +200,10 @@ const PackDisplay = ({
         {Object.entries(packInventory).map(([packType, count]) => {
           if (count <= 0) return null;
           const config = packs[packType];
+          if (!config) {
+            console.warn(`PackDisplay: Skipping rendering of packType "${packType}" because its configuration is missing.`);
+            return null;
+          }
 
           return (
             <motion.div

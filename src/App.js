@@ -113,6 +113,12 @@ const AppContent = () => {
 
   // Load data from localStorage on component mount
   useEffect(() => {
+    // Only proceed if packs are loaded
+    if (Object.keys(packs).length === 0) {
+      console.log('Free pack useEffect: Packs not yet loaded, skipping free pack calculation.');
+      return;
+    }
+
     const savedMoney = localStorage.getItem('mtgMoney');
     const savedLastFreePack = localStorage.getItem('mtgLastFreePack');
 
@@ -132,7 +138,11 @@ const AppContent = () => {
         const packsEarned = Math.floor(diff / APP_CONFIG.freePackInterval);
 
         if (packsEarned > 0) {
-          const packTypes = Object.keys(packs); // Use dynamically loaded packs
+          const packTypes = Object.keys(packs);
+          // This warning should now ideally not be hit if the initial check works
+          if (packTypes.length === 0) {
+            console.warn('No pack types available for free pack calculation, packs object is empty (unexpected).');
+          }
           let newPacks = {};
           for (let i = 0; i < packsEarned; i++) {
             const randomPackType = packTypes[Math.floor(Math.random() * packTypes.length)];
@@ -175,7 +185,7 @@ const AppContent = () => {
     } catch (err) {
       console.warn('Error reconciling pending opened cards:', err);
     }
-  }, [packs]); // Depend on 'packs' to ensure they are loaded before calculating free packs
+  }, [packs, currentPack]);
 
   // Save data to localStorage whenever it changes
   useEffect(() => {
@@ -229,6 +239,9 @@ const AppContent = () => {
   // Automatically claim free pack when time is up
   useEffect(() => {
     if (nextFreePackTime && new Date() >= nextFreePackTime) {
+      // Immediately set nextFreePackTime to null to prevent re-triggering
+      // before lastFreePack update propagates.
+      setNextFreePackTime(null);
       claimFreePack();
     }
   }, [nextFreePackTime, claimFreePack]);
