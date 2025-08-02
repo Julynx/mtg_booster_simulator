@@ -79,7 +79,7 @@ const Card = ({ card, index, isFlipped, onFlip, getAuraColor, onPreview, animati
           {/* BACK: for single-face cards show card back, for double-faced show the second face */}
           <div className={styles.cardBack}>
             <img
-              src={card.card_faces ? (card.card_faces[1] || card.image) : "/assets/card_back.jpg"}
+              src={card.card_faces ? (card.card_faces[1] || card.image) : `${process.env.PUBLIC_URL}/assets/card_back.jpg`}
               alt={card.name}
               className={styles.cardBackImage}
             />
