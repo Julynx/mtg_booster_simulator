@@ -1,3 +1,3 @@
 # mtg_booster_simulator
 
-> TODO: Write this README.md
+https://julynx.github.io/mtg_booster_simulator/
