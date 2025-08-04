@@ -21,6 +21,7 @@ import styles from './App.module.css';
  * @returns {JSX.Element} The rendered application content
  */
 const AppContent = () => {
+  // Ensure home title is set on initial mount and when Store/Collection modals are closed
   const { addNotification } = useNotification();
   const [packs, setPacks] = useState({}); // State to store loaded booster packs
   const [currentPack, setCurrentPack] = useState(null); // Default to null, will be set after loading
@@ -566,8 +567,8 @@ const App = () => {
   return (
     <NotificationProvider>
       <HelmetProvider>
-        <Helmet>
-          <title>MTG Booster Opener | Open Magic: The Gathering Packs Online</title>
+        {/* Keep base tags minimal to avoid overriding route-specific titles */}
+        <Helmet defaultTitle="MTG Booster Opener | Open Magic: The Gathering Packs Online" titleTemplate="%s">
           <meta
             name="description"
             content="Open MTG booster packs online with a realistic simulator. Explore sets, track your collection, and enjoy pack opening effects."
