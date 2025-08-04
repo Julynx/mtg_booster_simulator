@@ -152,6 +152,13 @@ export const BOOSTERS = [
         slots: cloneSlots(DEFAULT_SLOTS)
     },
     {
+        name: 'Edge of Eternities',
+        code: 'EOE',
+        image: 'boosters/edge_of_eternities.png',
+        price: 4.87,
+        slots: cloneSlots(DEFAULT_SLOTS)
+    },
+    {
         name: 'Bloomburrow',
         code: 'BLB',
         image: 'boosters/bloomburrow.png',
