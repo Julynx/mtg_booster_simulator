@@ -33,8 +33,17 @@ jobs:
       - name: Build
         env:
           CI: false
+          # Ensure CRA asset paths resolve correctly for project pages
           PUBLIC_URL: /mtg_booster_simulator
         run: npm run build
+
+      # Optional: verify sitemap and robots exist in the output
+      - name: Verify SEO artifacts
+        run: |
+          test -f public/sitemap.xml && echo "sitemap.xml exists in source"
+          test -f public/robots.txt && echo "robots.txt exists in source"
+          test -f build/sitemap.xml && echo "sitemap.xml copied to build" || cp public/sitemap.xml build/sitemap.xml
+          test -f build/robots.txt && echo "robots.txt copied to build" || cp public/robots.txt build/robots.txt
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3

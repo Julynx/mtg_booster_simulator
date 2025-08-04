@@ -1,3 +1,5 @@
 # https://www.robotstxt.org/robotstxt.html
 User-agent: *
-Disallow:
+Allow: /
+Sitemap: https://julynx.github.io/mtg_booster_simulator/sitemap.xml
+# GitHub Pages serves the site under /mtg_booster_simulator. Ensure all internal links respect this base path.

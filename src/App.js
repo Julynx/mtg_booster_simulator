@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { AnimatePresence, motion } from 'framer-motion'; // Import AnimatePresence and motion
 import { ShoppingCart, DollarSign } from 'lucide-react'; // Import icons
+import { Helmet, HelmetProvider } from 'react-helmet-async';
 import Header from './components/Header';
 import PackDisplay from './components/PackDisplay';
 import CardDisplay from './components/CardDisplay';
@@ -564,7 +565,17 @@ const AppContent = () => {
 const App = () => {
   return (
     <NotificationProvider>
-      <AppContent />
+      <HelmetProvider>
+        <Helmet>
+          <title>MTG Booster Opener | Open Magic: The Gathering Packs Online</title>
+          <meta
+            name="description"
+            content="Open MTG booster packs online with a realistic simulator. Explore sets, track your collection, and enjoy pack opening effects."
+          />
+          <link rel="canonical" href="https://julynx.github.io/mtg_booster_simulator/" />
+        </Helmet>
+        <AppContent />
+      </HelmetProvider>
     </NotificationProvider>
   );
 };

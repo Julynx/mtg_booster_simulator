@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Gift } from 'lucide-react';
+import { Helmet } from 'react-helmet-async';
 import styles from './Store.module.css';
 import { useNotification } from './NotificationProvider';
 
@@ -97,9 +98,25 @@ const Store = ({ money, setMoney, collection, setCollection, openPack, packs, cu
     animate: { scale: 1, opacity: 1 },
     exit: { scale: 0.8, opacity: 0 }
   };
-
+ 
   return (
     <>
+      <Helmet>
+        <title>MTG Booster Store | Buy Virtual Booster Packs</title>
+        <meta
+          name="description"
+          content="Buy virtual MTG booster packs using in-app currency. Explore latest sets and add packs to your inventory."
+        />
+        <link rel="canonical" href="https://julynx.github.io/mtg_booster_simulator/store" />
+        <meta property="og:title" content="MTG Booster Store | Buy Virtual Booster Packs" />
+        <meta property="og:description" content="Buy virtual MTG booster packs using in-app currency. Explore latest sets and add packs to your inventory." />
+        <meta property="og:url" content="https://julynx.github.io/mtg_booster_simulator/store" />
+        <meta property="og:image" content="https://julynx.github.io/mtg_booster_simulator/readme_assets/homescreen.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="MTG Booster Store | Buy Virtual Booster Packs" />
+        <meta name="twitter:description" content="Buy virtual MTG booster packs using in-app currency. Explore latest sets and add packs to your inventory." />
+        <meta name="twitter:image" content="https://julynx.github.io/mtg_booster_simulator/readme_assets/homescreen.png" />
+      </Helmet>
       {showStore && (
         <motion.div
           className={styles.modalOverlay}

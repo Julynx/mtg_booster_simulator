@@ -2,6 +2,7 @@ import React, { useCallback, useState, useMemo, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion';
 import { BookOpen, X, Filter } from 'lucide-react';
 import { FixedSizeList } from 'react-window'; // Import FixedSizeList
+import { Helmet } from 'react-helmet-async';
 import styles from './Collection.module.css';
 import cardDisplayStyles from './CardDisplay.module.css'; // Import CardDisplay styles
 import { isValidRarity } from '../utils';
@@ -241,6 +242,22 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
 
   return (
     <>
+      <Helmet>
+        <title>Your MTG Collection | Track and Manage Pulled Cards</title>
+        <meta
+          name="description"
+          content="Browse and manage your MTG card collection from opened boosters. Filter by rarity, price, type, and foil; sell duplicates to earn in-app currency."
+        />
+        <link rel="canonical" href="https://julynx.github.io/mtg_booster_simulator/collection" />
+        <meta property="og:title" content="Your MTG Collection | Track and Manage Pulled Cards" />
+        <meta property="og:description" content="Browse and manage your MTG card collection from opened boosters. Filter by rarity, price, type, and foil; sell duplicates to earn in-app currency." />
+        <meta property="og:url" content="https://julynx.github.io/mtg_booster_simulator/collection" />
+        <meta property="og:image" content="https://julynx.github.io/mtg_booster_simulator/readme_assets/homescreen.png" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Your MTG Collection | Track and Manage Pulled Cards" />
+        <meta name="twitter:description" content="Browse and manage your MTG card collection from opened boosters. Filter by rarity, price, type, and foil; sell duplicates to earn in-app currency." />
+        <meta name="twitter:image" content="https://julynx.github.io/mtg_booster_simulator/readme_assets/homescreen.png" />
+      </Helmet>
       <motion.div className={styles.collectionButtonContainer} initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, delay: 0.8 }}>
         <motion.button className={styles.collectionButton} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={toggleCollection}>
           <BookOpen size={24} />
@@ -251,7 +268,7 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
           )}
         </motion.button>
       </motion.div>
-
+ 
       <AnimatePresence>
         {showCollection && (
           <motion.div className={styles.modalOverlay} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
