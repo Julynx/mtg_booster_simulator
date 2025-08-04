@@ -125,7 +125,7 @@ export const fetchBoosterPack = async (setCode, slots = null) => {
     if (raw) arr.push(formatCardData(raw, explicitFoil));
   };
 
-  // If slots provided, honor them; otherwise fall back to legacy 14-card logic
+  // If slots provided, honor them; otherwise, refuse legacy fallback to avoid inconsistent pack sizes.
   if (Array.isArray(slots) && slots.length > 0) {
     const formatted = [];
     console.log('[mtg-api] fetchBoosterPack per-slot mode enabled. slots:', slots);
@@ -211,115 +211,10 @@ export const fetchBoosterPack = async (setCode, slots = null) => {
     }
 
     return formatted;
-  }
-
-  // Legacy fallback: 14-card construction similar to previous behavior
-  const rawCards = [];
-  const foilStatuses = [];
-  console.log('[mtg-api] fetchBoosterPack legacy mode (no slots). set:', setCode);
-
-  // 7 Common cards
-  for (let i = 0; i < 7; i++) {
-    rawCards.push(await fetchRawCard({ rarity: 'common', queryFoil: false }));
-    foilStatuses.push(false);
-  }
-
-  // 3 Uncommon cards
-  for (let i = 0; i < 3; i++) {
-    rawCards.push(await fetchRawCard({ rarity: 'uncommon', queryFoil: false }));
-    foilStatuses.push(false);
-  }
-
-  // 1 Rare or Mythic Rare
-  const isMythic = Math.random() < (1 / 7);
-  rawCards.push(await fetchRawCard({ rarity: isMythic ? 'mythic' : 'rare', queryFoil: false }));
-  foilStatuses.push(false);
-
-  // Land slot: 95% basic in-set, 5% non-basic in-set
-  const pickBasic = Math.random() < 0.95;
-  if (pickBasic) {
-    console.log('[mtg-api] legacy land slot: basic');
-    rawCards.push(await fetchRawCard({ rarity: null, queryFoil: null, pool: 'land', type: 'basic' }));
-    foilStatuses.push(false);
   } else {
-    // non-basic land in set
-    try {
-      const query = `set:${setCode} t:land -t:basic`;
-      console.log('[mtg-api] legacy land slot non-basic query:', query);
-      const response = await fetch(`https://api.scryfall.com/cards/random?q=${encodeURIComponent(query)}`);
-      const card = await response.json();
-      console.log('[mtg-api] legacy land slot non-basic response:', {
-        ok: !!card && card.object !== 'error',
-        finishes: card?.finishes,
-        foilField: card?.foil,
-        nonfoilField: card?.nonfoil,
-        name: card?.name,
-        id: card?.id
-      });
-      if (card && card.object !== 'error') {
-        rawCards.push(card);
-        foilStatuses.push(false);
-      } else {
-        const fallback = await fetchRawCard({ rarity: null, queryFoil: false, pool: 'land' });
-        rawCards.push(fallback);
-        foilStatuses.push(false);
-      }
-    } catch (e) {
-      console.warn('[mtg-api] legacy land slot non-basic error:', e);
-      const fallback = await fetchRawCard({ rarity: null, queryFoil: false, pool: 'land' });
-      rawCards.push(fallback);
-      foilStatuses.push(false);
-    }
+    console.warn('[mtg-api] No valid slots provided for set', setCode, '- refusing legacy fallback to avoid inconsistent pack sizes. Ensure slots are defined in boosters config.');
+    return [];
   }
-
-  // 1 Non-foil wildcard (any rarity)
-  rawCards.push(await fetchRawCard({ rarity: null, queryFoil: false }));
-  foilStatuses.push(false);
-
-  // 1 Foil wildcard (any rarity) - explicitly request foil
-  {
-    console.log('[mtg-api] legacy foil wildcard slot: explicit foil');
-    const raw = await fetchRawCard({ rarity: null, queryFoil: true });
-    rawCards.push(raw);
-    foilStatuses.push(true);
-  }
-
-  // Format and pad/trim to 14
-  let finalFormattedCards = [];
-  for (let i = 0; i < rawCards.length; i++) {
-    if (rawCards[i]) {
-      finalFormattedCards.push(formatCardData(rawCards[i], foilStatuses[i]));
-    }
-  }
-  while (finalFormattedCards.length < 14) {
-    try {
-      const randomCardResponse = await fetch('https://api.scryfall.com/cards/random');
-      const randomCard = await randomCardResponse.json();
-      if (randomCard && randomCard.object !== 'error') {
-        finalFormattedCards.push(formatCardData(randomCard, false));
-      } else {
-        finalFormattedCards.push({
-          id: `placeholder_${Date.now()}_${Math.random()}`,
-          name: 'Placeholder Card',
-          rarity: 'common',
-          image: 'https://placehold.co/200x280/cccccc/000000?text=Error',
-          foil: false,
-          type: 'unknown'
-        });
-      }
-    } catch {
-      finalFormattedCards.push({
-        id: `placeholder_${Date.now()}_${Math.random()}`,
-        name: 'Placeholder Card',
-        rarity: 'common',
-        image: 'https://placehold.co/200x280/cccccc/000000?text=Error',
-        foil: false,
-        type: 'unknown'
-      });
-    }
-  }
-  finalFormattedCards = finalFormattedCards.slice(0, 14);
-  return finalFormattedCards;
 };
 
 /**

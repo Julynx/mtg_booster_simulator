@@ -27,10 +27,13 @@ const BackgroundParticles = ({ isOpening, cards }) => {
   }, []);
 
   const openingParticles = React.useMemo(() => {
+    const hasWindow = typeof window !== 'undefined' && window && typeof window.innerWidth === 'number';
+    const w = hasWindow ? window.innerWidth : 1024;
+    const h = hasWindow ? window.innerHeight : 768;
     return Array.from({ length: openingParticleCount }, (_, i) => ({
       id: i,
-      x: Math.random() * window.innerWidth,
-      y: Math.random() * window.innerHeight
+      x: Math.random() * w,
+      y: Math.random() * h
     }));
   }, []);
 
@@ -64,8 +67,8 @@ const BackgroundParticles = ({ isOpening, cards }) => {
               key={particle.id}
               className={styles.openingParticle}
               initial={{
-                x: window.innerWidth / 2,
-                y: window.innerHeight / 2,
+                x: (typeof window !== 'undefined' && window && typeof window.innerWidth === 'number') ? window.innerWidth / 2 : 512,
+                y: (typeof window !== 'undefined' && window && typeof window.innerHeight === 'number') ? window.innerHeight / 2 : 384,
                 opacity: 1
               }}
               animate={{

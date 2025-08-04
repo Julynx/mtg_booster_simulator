@@ -158,7 +158,7 @@ const PackDisplay = ({
           <div className={styles.freePackInfo}>
             <Gift size={20} />
             <span className={styles.freePackText}>
-              {nextFreePackTime ? <CountdownTimer targetTime={nextFreePackTime} /> : 'Claim your free pack!'}
+              {nextFreePackTime ? <CountdownTimer targetTime={nextFreePackTime} /> : 'Free pack every 6 hours'}
             </span>
           </div>
         </div>
@@ -186,7 +186,7 @@ const PackDisplay = ({
           <div className={styles.freePackInfo}>
             <Gift size={20} />
             <span className={styles.freePackText}>
-              {nextFreePackTime ? <CountdownTimer targetTime={nextFreePackTime} /> : 'Claim your free pack!'}
+              {nextFreePackTime ? <CountdownTimer targetTime={nextFreePackTime} /> : 'Free pack every 6 hours'}
             </span>
           </div>
         </div>
@@ -283,7 +283,7 @@ const PackDisplay = ({
         <div className={styles.freePackInfo}>
           <Gift size={20} />
           <span className={styles.freePackText}>
-            {nextFreePackTime ? <CountdownTimer targetTime={nextFreePackTime} /> : 'Claim your free pack!'}
+            {nextFreePackTime ? <CountdownTimer targetTime={nextFreePackTime} /> : 'Free pack every 6 hours'}
           </span>
         </div>
       </div>

@@ -54,12 +54,8 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
     // Prefer removing by unique instance id to avoid unintended removals
     const newCollection = [];
     for (const card of collection) {
-      if (
-        remainingToRemove > 0 &&
-        card.name === (cardDisplayCandidateRef.current?.name ?? '') && // best-effort name match from last clicked
-        card.setCode === (cardDisplayCandidateRef.current?.setCode ?? card.setCode) &&
-        card.foil === (cardDisplayCandidateRef.current?.foil ?? card.foil)
-      ) {
+      const key = `${card.name}-${(card.set || 'unknown')}-${card.foil ? 'foil' : 'nonfoil'}`;
+      if (remainingToRemove > 0 && key === (cardDisplayCandidateRef.current?.groupKey ?? '')) {
         // remove this instance
         soldValue += card.price || 0.10;
         remainingToRemove -= 1;
@@ -86,8 +82,11 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
   const cardDisplayCandidateRef = useRef(null);
 
   const sellCard = useCallback((cardToSell, count = 1) => {
-    // Remember which grouped card we are operating on
-    cardDisplayCandidateRef.current = cardToSell;
+    // Remember which grouped card we are operating on (use stable group key)
+    const key =
+      cardToSell.__groupKey ||
+      `${cardToSell.name}-${(cardToSell.set || 'unknown')}-${cardToSell.foil ? 'foil' : 'nonfoil'}`;
+    cardDisplayCandidateRef.current = { groupKey: key };
     // Queue the amount to sell and process in a batched manner
     sellQueueRef.current += Math.max(1, count);
     processSellQueue();
@@ -125,7 +124,7 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
       // Include foil status in the key to separate foil and non-foil versions
       const key = `${card.name}-${card.set || 'unknown'}-${card.foil ? 'foil' : 'nonfoil'}`;
       if (!acc[key]) {
-        acc[key] = { ...card, count: 1, totalPrice: card.price || 0.10, foil: card.foil }; // Ensure foil property is passed
+        acc[key] = { ...card, count: 1, totalPrice: card.price || 0.10, foil: card.foil, __groupKey: key }; // store stable group key
       } else {
         acc[key].count++;
         acc[key].totalPrice += card.price || 0.10;
