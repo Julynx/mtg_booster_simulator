@@ -544,6 +544,7 @@ const AppContent = () => {
         getRarityColor={getRarityColor}
         setCollection={setCollection}
         setMoney={setMoney}
+        packs={packConfig}
       />
 
       {/* Legal disclaimer at bottom of main screen */}

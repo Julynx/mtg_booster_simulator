@@ -337,3 +337,101 @@ export const getPriceCategory = (price) => {
   if (price < 20) return 'expensive';
   return 'premium';
 };
+ 
+/**
+ * Fetch all unique print cards for a given set code from Scryfall, with pagination and caching.
+ * Returns lightweight normalized objects suitable for Collection missing entries.
+ * @param {string} setCode
+ * @returns {Promise<Array>} Array of normalized card entries
+ */
+export const fetchAllCardsInSet = async (setCode) => {
+  if (!setCode || typeof setCode !== 'string') {
+    throw new Error('fetchAllCardsInSet requires a non-empty setCode string');
+  }
+  const cacheKey = `all_set_${setCode.toLowerCase()}`;
+  const cached = cardCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+
+  const baseUrl = `https://api.scryfall.com/cards/search?q=e%3A${encodeURIComponent(setCode)}&unique=prints`;
+  let url = baseUrl;
+  const results = [];
+
+  try {
+    while (url) {
+      const resp = await fetch(url);
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+      const json = await resp.json();
+      if (json.object === 'error') {
+        throw new Error(json.details || 'Scryfall error object returned');
+      }
+
+      const data = Array.isArray(json.data) ? json.data : [];
+      for (const card of data) {
+        // Skip tokens and cards without usable imagery
+        if (card.layout === 'token' || card.set_type === 'token') continue;
+
+        // Determine image URL, preferring normal PNG. For double-faced, use front face image.
+        let imageUrl = '';
+        if (card.image_uris && (card.image_uris.normal || card.image_uris.large || card.image_uris.small)) {
+          imageUrl = card.image_uris.normal || card.image_uris.large || card.image_uris.small || '';
+        } else if (Array.isArray(card.card_faces) && card.card_faces.length > 0) {
+          const front = card.card_faces[0];
+          if (front && front.image_uris) {
+            imageUrl = front.image_uris.normal || front.image_uris.large || front.image_uris.small || '';
+          }
+        }
+        if (!imageUrl) continue; // skip entries without usable images
+
+        // Normalize rarity exactly as in formatCardData
+        let rarity = 'common';
+        if (card.rarity) {
+          switch ((card.rarity || '').toLowerCase()) {
+            case 'common':
+              rarity = 'common';
+              break;
+            case 'uncommon':
+              rarity = 'uncommon';
+              break;
+            case 'rare':
+              rarity = 'rare';
+              break;
+            case 'mythic':
+            case 'mythic rare':
+              rarity = 'mythic';
+              break;
+            default:
+              rarity = 'common';
+          }
+        }
+
+        const normalized = {
+          originalId: card.id,
+          name: card.name || 'Unknown Card',
+          rarity,
+          type: card.type_line || 'Unknown',
+          set: card.set_name || 'Unknown Set',
+          setCode: card.set || (setCode.toLowerCase()),
+          collectorNumber: String(card.collector_number || ''),
+          image: imageUrl,
+          foil: false,
+          price: 0
+        };
+        results.push(normalized);
+      }
+
+      url = json.has_more ? json.next_page : null;
+    }
+
+    // Cache and return
+    cardCache.set(cacheKey, { data: results, timestamp: Date.now() });
+    return results;
+  } catch (err) {
+    // Wrap with context and rethrow a clean Error
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Failed to fetch all cards for set "${setCode}": ${message}`);
+  }
+};

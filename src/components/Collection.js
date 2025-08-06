@@ -6,8 +6,9 @@ import { Helmet } from 'react-helmet-async';
 import styles from './Collection.module.css';
 import cardDisplayStyles from './CardDisplay.module.css'; // Import CardDisplay styles
 import { isValidRarity } from '../utils';
+import { fetchAllCardsInSet } from '../mtg-api';
 
-const Collection = ({ collection, showCollection, setShowCollection, getRarityColor, setCollection, setMoney }) => {
+const Collection = ({ collection, showCollection, setShowCollection, getRarityColor, setCollection, setMoney, packs }) => {
   const [previewCard, setPreviewCard] = useState(null);
   const [previewFace, setPreviewFace] = useState(0);
   const [sortOption, setSortOption] = useState('name');
@@ -16,6 +17,12 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
   const [filterType, setFilterType] = useState('all'); // New state for type filter
   const [showFilters, setShowFilters] = useState(false);
   const [columnCount, setColumnCount] = useState(1); // New state for column count
+  // Set filter state
+  const [selectedSetCode, setSelectedSetCode] = useState('all');
+  // Cache full set contents per setCode
+  const fullSetCacheRef = useRef(new Map());
+  const [fullSetCards, setFullSetCards] = useState([]);
+  const [isLoadingSet, setIsLoadingSet] = useState(false);
 
   const cardTypes = useMemo(() => [
     "All", "Creature", "Instant", "Sorcery", "Land", "Artifact", "Enchantment",
@@ -92,6 +99,38 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
     processSellQueue();
   }, [processSellQueue]);
 
+  // Fetch full set contents when a set is selected; cached per-set
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      if (selectedSetCode === 'all') {
+        setFullSetCards([]);
+        return;
+      }
+      const key = selectedSetCode.toLowerCase();
+      if (fullSetCacheRef.current.has(key)) {
+        setFullSetCards(fullSetCacheRef.current.get(key));
+        return;
+      }
+      setIsLoadingSet(true);
+      try {
+        const all = await fetchAllCardsInSet(key);
+        if (!active) return;
+        fullSetCacheRef.current.set(key, all);
+        setFullSetCards(all);
+      } catch (e) {
+        console.warn('Failed loading full set cards:', e);
+        if (!active) return;
+        setFullSetCards([]);
+      } finally {
+        if (active) setIsLoadingSet(false);
+      }
+    };
+    load();
+    return () => { active = false; };
+  }, [selectedSetCode]);
+
+  // Build the base processed list from owned collection + filters
   const processedCards = useMemo(() => {
     let filtered = collection;
 
@@ -107,24 +146,40 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
       filtered = filtered.filter(card => card.type && card.type.includes(filterType)); // Changed card.type_line to card.type
     }
 
+    // If a specific set is selected, only owned cards from that set
+    if (selectedSetCode !== 'all') {
+      filtered = filtered.filter(card => (card.setCode || '').toLowerCase() === selectedSetCode.toLowerCase());
+    }
+
     return [...filtered].sort((a, b) => {
       switch (sortOption) {
         case 'name': return a.name.localeCompare(b.name);
         case 'rarity': return a.rarity.localeCompare(b.rarity);
         case 'price': return (b.price || 0) - (a.price || 0);
         case 'set': return (a.set || '').localeCompare(b.set || '');
+        case 'setOrder': {
+          // Only meaningful when a single set is selected; fallback to collectorNumber compare
+          const parseNum = (s) => {
+            const n = parseInt(String(s ?? '').replace(/[^0-9]/g, ''), 10);
+            return isNaN(n) ? Number.MAX_SAFE_INTEGER : n;
+          };
+          const an = parseNum(a.collectorNumber);
+          const bn = parseNum(b.collectorNumber);
+          if (an !== bn) return an - bn;
+          return (a.name || '').localeCompare(b.name || '');
+        }
         case 'dateObtained': return (b.dateObtained || 0) - (a.dateObtained || 0); // Sort by date obtained (newest first)
         default: return 0;
       }
     });
-  }, [collection, filterRarity, filterFoil, filterType, sortOption]);
+  }, [collection, filterRarity, filterFoil, filterType, sortOption, selectedSetCode]);
 
-  const groupedCards = useMemo(() => {
+  // Group owned cards
+  const groupedOwned = useMemo(() => {
     return processedCards.reduce((acc, card) => {
-      // Include foil status in the key to separate foil and non-foil versions
       const key = `${card.name}-${card.set || 'unknown'}-${card.foil ? 'foil' : 'nonfoil'}`;
       if (!acc[key]) {
-        acc[key] = { ...card, count: 1, totalPrice: card.price || 0.10, foil: card.foil, __groupKey: key }; // store stable group key
+        acc[key] = { ...card, count: 1, totalPrice: card.price || 0.10, foil: card.foil, __groupKey: key };
       } else {
         acc[key].count++;
         acc[key].totalPrice += card.price || 0.10;
@@ -133,8 +188,66 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
     }, {});
   }, [processedCards]);
 
+  // If a set is selected, synthesize missing entries (count 0, nonfoil) and merge.
+  // In this set-filter-only view, owning a foil also counts as owning the card (do not create a missing entry).
+  const groupedCards = useMemo(() => {
+    if (selectedSetCode === 'all' || fullSetCards.length === 0) {
+      return groupedOwned;
+    }
+
+    const merged = { ...groupedOwned };
+
+    // Build a name+set index of owned cards considering BOTH nonfoil and foil as owned
+    // This only affects the set-filter view; global grouping logic elsewhere remains unchanged.
+    const ownedNameSet = new Set(
+      Object.keys(groupedOwned).map(k => {
+        // Normalize to "Name-Set" by stripping the "-foil"/"-nonfoil" suffix
+        return k.replace(/-(foil|nonfoil)$/i, '');
+      })
+    );
+
+    for (const c of fullSetCards) {
+      const base = `${c.name}-${c.set || 'unknown'}`;
+      // If either foil or nonfoil owned, skip synthesizing missing for this name/set
+      if (ownedNameSet.has(base)) continue;
+
+      // Otherwise synthesize a nonfoil baseline entry marked as missing (count 0)
+      const key = `${base}-nonfoil`;
+      if (!merged[key]) {
+        merged[key] = {
+          ...c,
+          id: `missing_${c.originalId}`,
+          __groupKey: key,
+          count: 0,
+          totalPrice: 0,
+          foil: false,
+          price: 0
+        };
+      }
+    }
+    return merged;
+  }, [groupedOwned, fullSetCards, selectedSetCode]);
+
   // Convert groupedCards object to an array for FixedSizeList
-  const groupedCardsArray = useMemo(() => Object.values(groupedCards), [groupedCards]);
+  const groupedCardsArray = useMemo(() => {
+    const arr = Object.values(groupedCards);
+
+    // When a specific set is selected and sortOption is setOrder, sort by collectorNumber ascending (numeric-aware)
+    if (selectedSetCode !== 'all' && sortOption === 'setOrder') {
+      const parseNum = (s) => {
+        const n = parseInt(String(s).replace(/[^0-9]/g, ''), 10);
+        return isNaN(n) ? Number.MAX_SAFE_INTEGER : n;
+      };
+      arr.sort((a, b) => {
+        const an = parseNum(a.collectorNumber);
+        const bn = parseNum(b.collectorNumber);
+        if (an !== bn) return an - bn;
+        return (a.name || '').localeCompare(b.name || '');
+      });
+    }
+
+    return arr;
+  }, [groupedCards, selectedSetCode, sortOption]);
 
   // Row component for FixedSizeList
   // itemData will contain { groupedCardsArray, getCardImageStyle, showCardPreview, sellCard, columnCount }
@@ -169,9 +282,9 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
                 <motion.img
                   src={cardGroup.image}
                   alt={cardGroup.name}
-                  className={styles.cardImage}
+                  className={`${styles.cardImage} ${cardGroup.count === 0 ? styles.missingCardImage : ''}`}
                   style={getCardImageStyle(cardGroup.rarity)}
-                  onClick={() => showCardPreview(cardGroup)}
+                  onClick={() => cardGroup.count > 0 && showCardPreview(cardGroup)}
                   whileHover={{ scale: 1.05 }}
                   transition={{ duration: 0.2, ease: "easeOut" }}
                 />
@@ -192,9 +305,24 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
                     <span className={styles.cardPrice}>${cardGroup.price ? cardGroup.price.toFixed(2) : '0.10'}</span>
                   </div>
                   <div className={styles.cardActions}>
-                    <span className={styles.cardCount}>{cardGroup.count} copies</span>
-                    <button className={styles.sellButton} onClick={() => sellCard(cardGroup, 1)}>Sell 1</button>
-                    {cardGroup.count > 1 && <button className={styles.sellAllButton} onClick={() => sellCard(cardGroup, cardGroup.count)}>Sell All</button>}
+                    <span className={styles.cardCount}>{cardGroup.count} {cardGroup.count === 1 ? 'copy' : 'copies'}</span>
+                    <button
+                      className={`${styles.sellButton} ${cardGroup.count === 0 ? styles.disabledButton : ''}`}
+                      onClick={() => cardGroup.count > 0 && sellCard(cardGroup, 1)}
+                      disabled={cardGroup.count === 0}
+                      title={cardGroup.count === 0 ? 'You do not own this card yet' : 'Sell one copy'}
+                    >
+                      Sell 1
+                    </button>
+                    {cardGroup.count > 1 && (
+                      <button
+                        className={styles.sellAllButton}
+                        onClick={() => sellCard(cardGroup, cardGroup.count)}
+                        title="Sell all copies"
+                      >
+                        Sell All
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -277,13 +405,18 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
                   Your Collection ({processedCards.length} cards)
                   <span className={styles.totalValue}>
                     {(() => {
-                      // Sum total value including duplicates
                       const total = groupedCardsArray.reduce((sum, cg) => {
                         const price = typeof cg.price === 'number' ? cg.price : 0;
                         const count = typeof cg.count === 'number' ? cg.count : 0;
                         return sum + price * count;
                       }, 0);
-                      return ` • Total Value: $${total.toFixed(2)}`;
+                      let progress = '';
+                      if (selectedSetCode !== 'all') {
+                        const totalUnique = fullSetCards.length;
+                        const ownedUnique = groupedCardsArray.reduce((acc, cg) => acc + (cg.count > 0 ? 1 : 0), 0);
+                        progress = ` • Collected ${ownedUnique}/${totalUnique}`;
+                      }
+                      return ` • Total Value: $${total.toFixed(2)}${progress}`;
                     })()}
                   </span>
                 </h2>
@@ -332,6 +465,7 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
                       <option value="price">Price</option>
                       <option value="set">Set</option>
                       <option value="dateObtained">Date Obtained</option>
+                      {selectedSetCode !== 'all' && <option value="setOrder">Set Order (Collector #)</option>}
                     </select>
                   </div>
                   <div className={styles.filterGroup}>
@@ -359,6 +493,34 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
                         <option key={type} value={type === "All" ? "all" : type}>{type}</option>
                       ))}
                     </select>
+                  </div>
+                  <div className={styles.filterGroup}>
+                    <label>Filter by set:</label>
+                    <select
+                      value={selectedSetCode}
+                      onChange={(e) => setSelectedSetCode(e.target.value)}
+                      className={styles.select}
+                    >
+                      <option value="all">All Sets</option>
+                      {packs && Object.keys(packs).map(code => (
+                        <option key={code} value={code}>{packs[code].name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {isLoadingSet && selectedSetCode !== 'all' && (
+                    <div className={styles.filterGroup}>
+                      <label>Loading selected set...</label>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Loading full set overlay */}
+              {isLoadingSet && selectedSetCode !== 'all' && (
+                <div className={styles.loadingOverlay}>
+                  <div className={styles.loadingContent}>
+                    <div className={styles.spinner} />
+                    <div>Loading set cards…</div>
                   </div>
                 </div>
               )}
