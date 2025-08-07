@@ -408,6 +408,23 @@ export const fetchAllCardsInSet = async (setCode) => {
           }
         }
 
+        let price = 0;
+        // if (card.prices) {
+        //   const rawFoil = typeof card.prices.usd_foil === 'string' ? parseFloat(card.prices.usd_foil) : NaN;
+        //   const rawUsd = typeof card.prices.usd === 'string' ? parseFloat(card.prices.usd) : NaN;
+        //   const isFoil = false; // For fetchAllCardsInSet, we assume non-foil by default for collection view
+
+        //   if (isFoil && !isNaN(rawFoil)) {
+        //     price = rawFoil;
+        //   } else if (!isNaN(rawUsd)) {
+        //     price = rawUsd;
+        //   } else if (!isNaN(rawFoil)) {
+        //     price = rawFoil;
+        //   } else {
+        //     price = 0;
+        //   }
+        // }
+
         const normalized = {
           originalId: card.id,
           name: card.name || 'Unknown Card',
@@ -418,7 +435,7 @@ export const fetchAllCardsInSet = async (setCode) => {
           collectorNumber: String(card.collector_number || ''),
           image: imageUrl,
           foil: false,
-          price: 0
+          price: price
         };
         results.push(normalized);
       }

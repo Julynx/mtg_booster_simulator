@@ -302,7 +302,7 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
                         {cardGroup.set}
                       </a>
                     )}
-                    <span className={styles.cardPrice}>${cardGroup.price ? cardGroup.price.toFixed(2) : '0.10'}</span>
+                    <span className={styles.cardPrice}>${cardGroup.price.toFixed(2)}</span>
                   </div>
                   <div className={styles.cardActions}>
                     <span className={styles.cardCount}>{cardGroup.count} {cardGroup.count === 1 ? 'copy' : 'copies'}</span>
@@ -507,11 +507,6 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
                       ))}
                     </select>
                   </div>
-                  {isLoadingSet && selectedSetCode !== 'all' && (
-                    <div className={styles.filterGroup}>
-                      <label>Loading selected set...</label>
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -582,7 +577,7 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
                       </a>
                     )}
                     {previewCard.foil && <span className={cardDisplayStyles.foilTag}>FOIL</span>}
-                  <span className={cardDisplayStyles.previewPrice}>${previewCard.price ? previewCard.price.toFixed(2) : '0.10'}</span>
+                  <span className={cardDisplayStyles.previewPrice}>${previewCard.price.toFixed(2)}</span>
                 </div>
               </div>
             </motion.div>
