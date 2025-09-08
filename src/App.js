@@ -10,8 +10,9 @@ import Collection from './components/Collection';
 import BackgroundParticles from './components/BackgroundParticles';
 import Store from './components/Store';
 import PackOpeningScreen from './components/PackOpeningScreen'; // Import PackOpeningScreen
+import ErrorBoundary from './components/ErrorBoundary'; // Import ErrorBoundary
 import { NotificationProvider, useNotification } from './components/NotificationProvider';
-import { getRarityColor, getAuraColor, loadBoosters } from './utils';
+import { getRarityColor, getAuraColor, loadBoosters, logger, performanceMonitor } from './utils';
 import { fetchBoosterPack } from './mtg-api';
 import { APP_CONFIG } from './config';
 import styles from './App.module.css';
@@ -273,8 +274,14 @@ const AppContent = () => {
    * 4. Show cards
    */
   const openPack = useCallback(async (packType = currentPack) => {
+    const operationId = `openPack_${packType}_${Date.now()}`;
+    const startTime = performanceMonitor.start(`Pack opening for ${packType}`);
+
+    logger.log(`Starting pack opening operation`, { packType, operationId });
+
     // Check if we have packs available
     if (!packInventory[packType] || packInventory[packType] <= 0) {
+      logger.warn(`No packs available for type: ${packType}`, { packInventory });
       addNotification({
         message: 'No packs available! Visit the store to buy more.',
         type: 'error',
@@ -284,6 +291,8 @@ const AppContent = () => {
     }
 
     setIsLoading(true); // Start loading
+    logger.log(`Pack opening UI state initialized`, { packType });
+
     // Start opening sequence
     setIsOpening(true);
     setOpeningPackType(packType);
@@ -296,17 +305,30 @@ const AppContent = () => {
       [packType]: Math.max(0, (prev[packType] || 0) - 1)
     }));
 
+    logger.log(`Pack removed from inventory`, { packType, remaining: packInventory[packType] - 1 });
+
+    // Create a timeout promise to prevent hanging
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Pack opening timed out after 30 seconds')), 30000);
+    });
+
     try {
-      console.log('Opening pack for set:', packType);
+      logger.log(`Fetching cards for pack`, { packType });
       const packConfig = packs[packType];
 
-      // Fetch cards
-      let fetchedCards;
-      if (Array.isArray(packConfig.slots) && packConfig.slots.length > 0) {
-        fetchedCards = await fetchBoosterPack(packConfig.setCode, packConfig.slots);
-      } else {
-        fetchedCards = await fetchBoosterPack(packConfig.setCode);
+      if (!packConfig) {
+        throw new Error(`Pack configuration not found for type: ${packType}`);
       }
+
+      // Fetch cards with timeout
+      let fetchedCards;
+      const fetchPromise = Array.isArray(packConfig.slots) && packConfig.slots.length > 0
+        ? fetchBoosterPack(packConfig.setCode, packConfig.slots)
+        : fetchBoosterPack(packConfig.setCode);
+
+      fetchedCards = await Promise.race([fetchPromise, timeoutPromise]);
+
+      logger.log(`Cards fetched successfully`, { packType, cardCount: fetchedCards?.length });
 
       // Process cards - fail loudly if no valid cards
       if (!fetchedCards || fetchedCards.length === 0) {
@@ -317,7 +339,9 @@ const AppContent = () => {
       if (validCards.length === 0) {
         throw new Error('No valid cards returned from API');
       }
-      
+
+      logger.log(`Valid cards processed`, { packType, validCardCount: validCards.length });
+
       // Add cards to collection
       const now = Date.now(); // Get current timestamp in Unix milliseconds
       const cardsWithTimestamp = validCards.map(card => ({
@@ -328,9 +352,10 @@ const AppContent = () => {
       setCollection(prev => {
         const remainingSpace = APP_CONFIG.maxCollectionSize - prev.length;
         const toAdd = remainingSpace >= cardsWithTimestamp.length ? cardsWithTimestamp : cardsWithTimestamp.slice(0, Math.max(0, remainingSpace));
+        logger.log(`Cards added to collection`, { addedCount: toAdd.length, remainingSpace });
         return remainingSpace > 0 ? [...prev, ...toAdd] : prev;
       });
-      
+
       setPendingOpenedIds(cardsWithTimestamp.map(c => c.id)); // Use cardsWithTimestamp here
       setCards(cardsWithTimestamp); // Use cardsWithTimestamp here
 
@@ -338,10 +363,19 @@ const AppContent = () => {
       setAnimationPhase('cards');
       setTriggerPackExplosion(true); // Trigger explosion in PackOpeningScreen
 
+      performanceMonitor.end(`Pack opening for ${packType}`, startTime);
+      logger.log(`Pack opening completed successfully`, { packType, operationId });
+
     } catch (error) {
-      console.error('Error opening pack:', error);
+      logger.error(`Pack opening failed`, { packType, operationId, error: error.message });
+      performanceMonitor.end(`Pack opening for ${packType}`, startTime);
+
+      const errorMessage = error.message.includes('timed out')
+        ? 'Pack opening timed out. Please check your internet connection and try again.'
+        : `API Error: ${error.message}`;
+
       addNotification({
-        message: `API Error: ${error.message}`,
+        message: errorMessage,
         type: 'error',
         duration: 5000
       });
@@ -372,19 +406,29 @@ const AppContent = () => {
       if (!newSet.has(cardId)) {
         newSet.add(cardId);
         // Play sound only on first flip
-        const flipSound = new Audio(`${process.env.PUBLIC_URL}/assets/flash1.wav`);
-        const rarityPitchMap = {
-          'common': 1,
-          'uncommon': 0.9,
-          'rare': 0.7,
-          'mythic': 0.5,
-          'special': 1.6,
-          'bonus': 1.8
-        };
-        const pitch = rarityPitchMap[rarity] || 1.0; // Default to 1.0 if rarity not found
-        flipSound.playbackRate = pitch;
-        flipSound.preservesPitch = false;
-        flipSound.play().catch(e => console.error("Error playing flip sound:", e));
+        try {
+          const flipSound = new Audio(`${process.env.PUBLIC_URL}/assets/flash1.wav`);
+          const rarityPitchMap = {
+            'common': 1,
+            'uncommon': 0.9,
+            'rare': 0.7,
+            'mythic': 0.5,
+            'special': 1.6,
+            'bonus': 1.8
+          };
+          const pitch = rarityPitchMap[rarity] || 1.0; // Default to 1.0 if rarity not found
+          flipSound.playbackRate = pitch;
+          flipSound.preservesPitch = false;
+          flipSound.play().catch(e => console.error("Error playing flip sound:", e));
+
+          // Cleanup audio after playing
+          flipSound.addEventListener('ended', () => {
+            flipSound.pause();
+            flipSound.currentTime = 0;
+          });
+        } catch (error) {
+          console.error("Error creating flip sound:", error);
+        }
       }
       return newSet;
     });
@@ -549,7 +593,7 @@ const AppContent = () => {
 
       {/* Legal disclaimer at bottom of main screen */}
       <footer className={styles.legalDisclaimer}>
-        <p>All currency used within this simulation is entirely fictional and holds no real-world monetary value. All products presented are simulated and do not represent or replicate real-world goods. All referenced items, including card designs, names, and intellectual property, are the copyrighted property of Wizards of the Coast and Hasbro. This simulation is a fan-created experience and is not affiliated with, endorsed by, or associated with Wizards of the Coast or Hasbro.</p>
+        <p><strong>MTG Booster Pack Simulator:</strong> This is a virtual simulation game. All currency used within this simulator is entirely fictional and holds no real-world monetary value. All products presented are simulated and do not represent or replicate real-world goods. All referenced items, including card designs, names, and intellectual property, are the copyrighted property of Wizards of the Coast and Hasbro. This simulation is a fan-created experience and is not affiliated with, endorsed by, or associated with Wizards of the Coast or Hasbro.</p>
       </footer>
       <AnimatePresence>
         {isLoading && (
@@ -566,19 +610,31 @@ const AppContent = () => {
  */
 const App = () => {
   return (
-    <NotificationProvider>
-      <HelmetProvider>
-        {/* Keep base tags minimal to avoid overriding route-specific titles */}
-        <Helmet defaultTitle="MTG Booster Opener | Open Magic: The Gathering Packs Online" titleTemplate="%s">
-          <meta
-            name="description"
-            content="Open MTG booster packs online with a realistic simulator. Explore sets, track your collection, and enjoy pack opening effects."
-          />
-          <link rel="canonical" href="https://julynx.github.io/mtg_booster_simulator/" />
-        </Helmet>
-        <AppContent />
-      </HelmetProvider>
-    </NotificationProvider>
+    <ErrorBoundary>
+      <NotificationProvider>
+        <HelmetProvider>
+          {/* Keep base tags minimal to avoid overriding route-specific titles */}
+          <Helmet defaultTitle="MTG Booster Pack Simulator | Virtual Card Opening Game" titleTemplate="%s">
+            <meta
+              name="description"
+              content="MTG Booster Pack Simulator - Open virtual Magic: The Gathering booster packs online! Experience realistic card opening animations, collect cards from sets like Bloomburrow, Wilds of Eldraine, and more. Free online game!"
+            />
+            <link rel="canonical" href="https://julynx.github.io/mtg_booster_simulator/" />
+            <meta property="og:title" content="MTG Booster Pack Simulator | Virtual Card Opening Game" />
+            <meta property="og:description" content="MTG Booster Pack Simulator - Open virtual Magic: The Gathering booster packs online! Experience realistic card opening animations, collect cards from sets like Bloomburrow, Wilds of Eldraine, and more. Free online game!" />
+            <meta property="og:url" content="https://julynx.github.io/mtg_booster_simulator/" />
+            <meta property="og:image" content="https://julynx.github.io/mtg_booster_simulator/readme_assets/homescreen.png" />
+            <meta property="og:type" content="website" />
+            <meta name="twitter:card" content="summary_large_image" />
+            <meta name="twitter:title" content="MTG Booster Pack Simulator | Virtual Card Opening Game" />
+            <meta name="twitter:description" content="MTG Booster Pack Simulator - Open virtual Magic: The Gathering booster packs online! Experience realistic card opening animations, collect cards from sets like Bloomburrow, Wilds of Eldraine, and more. Free online game!" />
+            <meta name="twitter:image" content="https://julynx.github.io/mtg_booster_simulator/readme_assets/homescreen.png" />
+            <meta name="keywords" content="MTG simulator, Magic The Gathering simulator, booster pack simulator, virtual card opening, MTG game, online card game, collectible card game simulator, Bloomburrow simulator, Wilds of Eldraine simulator, free MTG game" />
+          </Helmet>
+          <AppContent />
+        </HelmetProvider>
+      </NotificationProvider>
+    </ErrorBoundary>
   );
 };
 

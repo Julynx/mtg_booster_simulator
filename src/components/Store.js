@@ -101,23 +101,24 @@ const Store = ({ money, setMoney, collection, setCollection, openPack, packs, cu
  
   return (
     <>
-      <Helmet>
-        <title>MTG Booster Store | Buy Virtual Booster Packs</title>
-        <meta
-          name="description"
-          content="Buy virtual MTG booster packs using in-app currency. Explore latest sets and add packs to your inventory."
-        />
-        <link rel="canonical" href="https://julynx.github.io/mtg_booster_simulator/store" />
-        <meta property="og:title" content="MTG Booster Store | Buy Virtual Booster Packs" />
-        <meta property="og:description" content="Buy virtual MTG booster packs using in-app currency. Explore latest sets and add packs to your inventory." />
-        <meta property="og:url" content="https://julynx.github.io/mtg_booster_simulator/store" />
-        <meta property="og:image" content="https://julynx.github.io/mtg_booster_simulator/readme_assets/homescreen.png" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="MTG Booster Store | Buy Virtual Booster Packs" />
-        <meta name="twitter:description" content="Buy virtual MTG booster packs using in-app currency. Explore latest sets and add packs to your inventory." />
-        <meta name="twitter:image" content="https://julynx.github.io/mtg_booster_simulator/readme_assets/homescreen.png" />
-      </Helmet>
       {showStore && (
+        <>
+          <Helmet>
+            <title>MTG Booster Store | Buy Virtual Booster Packs</title>
+            <meta
+              name="description"
+              content="Buy virtual MTG booster packs using in-app currency. Explore latest sets and add packs to your inventory."
+            />
+            <link rel="canonical" href="https://julynx.github.io/mtg_booster_simulator/store" />
+            <meta property="og:title" content="MTG Booster Store | Buy Virtual Booster Packs" />
+            <meta property="og:description" content="Buy virtual MTG booster packs using in-app currency. Explore latest sets and add packs to your inventory." />
+            <meta property="og:url" content="https://julynx.github.io/mtg_booster_simulator/store" />
+            <meta property="og:image" content="https://julynx.github.io/mtg_booster_simulator/readme_assets/homescreen.png" />
+            <meta name="twitter:card" content="summary_large_image" />
+            <meta name="twitter:title" content="MTG Booster Store | Buy Virtual Booster Packs" />
+            <meta name="twitter:description" content="Buy virtual MTG booster packs using in-app currency. Explore latest sets and add packs to your inventory." />
+            <meta name="twitter:image" content="https://julynx.github.io/mtg_booster_simulator/readme_assets/homescreen.png" />
+          </Helmet>
         <motion.div
           className={styles.modalOverlay}
           {...modalOverlayAnimation}
@@ -210,6 +211,7 @@ const Store = ({ money, setMoney, collection, setCollection, openPack, packs, cu
             </div>
           </motion.div>
         </motion.div>
+        </>
       )}
     </>
   );

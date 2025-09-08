@@ -6,35 +6,49 @@ import styles from './PackDisplay.module.css';
 // New component for individual sparkle animation
 const SparkleAnimation = ({ delay }) => {
   const controls = useAnimation();
+  const isMounted = React.useRef(true);
 
   useEffect(() => {
     const animateSparkle = async () => {
-      const initialLeft = `${Math.random() * 100}%`;
-      const initialTop = `${Math.random() * 80}%`;
-      await controls.set({ scale: 0, rotate: 0, left: initialLeft, top: initialTop });
+      try {
+        const initialLeft = `${Math.random() * 100}%`;
+        const initialTop = `${Math.random() * 80}%`;
+        await controls.set({ scale: 0, rotate: 0, left: initialLeft, top: initialTop });
 
-      await new Promise(resolve => setTimeout(resolve, delay * 1000));
+        await new Promise(resolve => setTimeout(resolve, delay * 1000));
 
-      while (true) {
-        await controls.start({
-          scale: 1,
-          rotate: 180,
-          transition: { duration: 2, ease: 'easeInOut' }
-        });
+        while (isMounted.current) {
+          await controls.start({
+            scale: 1,
+            rotate: 180,
+            transition: { duration: 2, ease: 'easeInOut' }
+          });
 
-        await controls.start({
-          scale: 0,
-          rotate: 360,
-          transition: { duration: 2, ease: 'easeInOut' }
-        });
+          if (!isMounted.current) break;
 
-        const newLeft = `${Math.random() * 100}%`;
-        const newTop = `${Math.random() * 80}%`;
-        await controls.set({ left: newLeft, top: newTop });
+          await controls.start({
+            scale: 0,
+            rotate: 360,
+            transition: { duration: 2, ease: 'easeInOut' }
+          });
+
+          if (!isMounted.current) break;
+
+          const newLeft = `${Math.random() * 100}%`;
+          const newTop = `${Math.random() * 80}%`;
+          await controls.set({ left: newLeft, top: newTop });
+        }
+      } catch (error) {
+        console.warn('Sparkle animation error:', error);
       }
     };
 
     animateSparkle();
+
+    return () => {
+      isMounted.current = false;
+      controls.stop();
+    };
   }, [controls, delay]);
 
   return (

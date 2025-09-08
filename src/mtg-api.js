@@ -2,6 +2,8 @@
  * MTG API utility functions for fetching real card data using direct fetch calls
  */
 
+import { logger } from './utils';
+
 // Cache for storing fetched cards to avoid repeated API calls
 const cardCache = new Map();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -12,11 +14,27 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
  */
 export const fetchRandomCard = async () => {
   try {
-    const response = await fetch('https://api.scryfall.com/cards/random');
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+
+    const response = await fetch('https://api.scryfall.com/cards/random', {
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
     const card = await response.json();
     return formatCardData(card);
   } catch (error) {
-    console.error('Error fetching random card:', error);
+    if (error.name === 'AbortError') {
+      console.error('Request timed out while fetching random card');
+    } else {
+      console.error('Error fetching random card:', error);
+    }
     return null;
   }
 };
@@ -36,22 +54,42 @@ export const fetchCardsBySet = async (setCode, count = 15) => {
       return cached.data;
     }
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
     // Fetch cards from the specified set
-    const response = await fetch(`https://api.scryfall.com/cards/search?q=set:${setCode}`);
+    const response = await fetch(`https://api.scryfall.com/cards/search?q=set:${setCode}`, {
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
     const result = await response.json();
-    
+
+    if (!result.data || !Array.isArray(result.data)) {
+      throw new Error('Invalid response format from Scryfall API');
+    }
+
     // Take only the requested number of cards
     const cards = result.data.slice(0, count).map(formatCardData);
-    
+
     // Cache the results
     cardCache.set(cacheKey, {
       data: cards,
       timestamp: Date.now()
     });
-    
+
     return cards;
   } catch (error) {
-    console.error(`Error fetching cards for set ${setCode}:`, error);
+    if (error.name === 'AbortError') {
+      console.error(`Request timed out while fetching cards for set ${setCode}`);
+    } else {
+      console.error(`Error fetching cards for set ${setCode}:`, error);
+    }
     return [];
   }
 };
@@ -62,6 +100,9 @@ export const fetchCardsBySet = async (setCode, count = 15) => {
  * @returns {Promise<Array>} Array of 15 cards representing a booster pack
  */
 export const fetchBoosterPack = async (setCode, slots = null) => {
+  const operationId = `fetchBoosterPack_${setCode}_${Date.now()}`;
+  logger.log(`Starting booster pack fetch`, { setCode, operationId, hasSlots: !!slots });
+
   // Helper to fetch a raw card with specific constraints; returns raw Scryfall card
   const fetchRawCard = async ({ rarity = null, queryFoil = undefined, pool = null, type = null }) => {
     let query = `set:${setCode}`;
@@ -85,7 +126,19 @@ export const fetchBoosterPack = async (setCode, slots = null) => {
     });
 
     try {
-      const response = await fetch(`https://api.scryfall.com/cards/random?q=${encodeURIComponent(query)}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+
+      const response = await fetch(`https://api.scryfall.com/cards/random?q=${encodeURIComponent(query)}`, {
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
       const card = await response.json();
       console.log('[mtg-api] fetchRawCard response:', {
         ok: !!card && card.object !== 'error',
@@ -100,10 +153,26 @@ export const fetchBoosterPack = async (setCode, slots = null) => {
         return card;
       }
     } catch (error) {
-      console.warn(`Failed to fetch raw card with query "${query}":`, error);
+      if (error.name === 'AbortError') {
+        console.warn(`Request timed out for query "${query}"`);
+      } else {
+        console.warn(`Failed to fetch raw card with query "${query}":`, error);
+      }
     }
     try {
-      const randomCardResponse = await fetch('https://api.scryfall.com/cards/random');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout for fallback
+
+      const randomCardResponse = await fetch('https://api.scryfall.com/cards/random', {
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!randomCardResponse.ok) {
+        throw new Error(`HTTP ${randomCardResponse.status}: ${randomCardResponse.statusText}`);
+      }
+
       const randomCard = await randomCardResponse.json();
       console.log('[mtg-api] fetchRawCard fallback /cards/random response:', {
         ok: !!randomCard && randomCard.object !== 'error',
@@ -117,7 +186,13 @@ export const fetchBoosterPack = async (setCode, slots = null) => {
       if (randomCard && randomCard.object !== 'error') {
         return randomCard;
       }
-    } catch {}
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.warn('Fallback request timed out');
+      } else {
+        console.warn('Fallback request failed:', error);
+      }
+    }
     return null;
   };
 
@@ -210,8 +285,10 @@ export const fetchBoosterPack = async (setCode, slots = null) => {
       }
     }
 
+    logger.log(`Booster pack fetch completed successfully`, { setCode, operationId, cardCount: formatted.length });
     return formatted;
   } else {
+    logger.warn(`No valid slots provided for set ${setCode}`, { operationId });
     console.warn('[mtg-api] No valid slots provided for set', setCode, '- refusing legacy fallback to avoid inconsistent pack sizes. Ensure slots are defined in boosters config.');
     return [];
   }
@@ -360,7 +437,15 @@ export const fetchAllCardsInSet = async (setCode) => {
 
   try {
     while (url) {
-      const resp = await fetch(url);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout for large requests
+
+      const resp = await fetch(url, {
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
       if (!resp.ok) {
         throw new Error(`HTTP ${resp.status}`);
       }

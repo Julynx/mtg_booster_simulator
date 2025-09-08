@@ -9,35 +9,59 @@ const PackOpeningScreen = ({ packConfig, onAnimationComplete, triggerExplosion }
 
   useEffect(() => {
     if (packConfig) {
-      const openingSound = new Audio(`${process.env.PUBLIC_URL}/assets/flash3.wav`);
-      openingSound.volume = 0.7;
-      openingSound.playbackRate = 0.9;
-      openingSound.play().catch(e => console.error("Error playing pack opening sound:", e));
-      setAnimationPhase('shaking');
+      let openingSound = null;
+      try {
+        openingSound = new Audio(`${process.env.PUBLIC_URL}/assets/flash3.wav`);
+        openingSound.volume = 0.7;
+        openingSound.playbackRate = 0.9;
+        openingSound.play().catch(e => console.error("Error playing pack opening sound:", e));
+        setAnimationPhase('shaking');
+      } catch (error) {
+        console.error("Error creating pack opening sound:", error);
+      }
+
+      return () => {
+        if (openingSound) {
+          openingSound.pause();
+          openingSound.currentTime = 0;
+        }
+      };
     }
   }, [packConfig]);
 
   useEffect(() => {
     if (triggerExplosion) {
-      setAnimationPhase('exploding');
-      setShowFlash(true);
-      // Play explosion sound
-      const explosionSound = new Audio(`${process.env.PUBLIC_URL}/assets/flash2.wav`);
-      explosionSound.volume = 0.5;
-      explosionSound.playbackRate = 1.4;
-      explosionSound.play().catch(e => console.error("Error playing explosion sound:", e));
+      let explosionSound = null;
+      try {
+        setAnimationPhase('exploding');
+        setShowFlash(true);
+        // Play explosion sound
+        explosionSound = new Audio(`${process.env.PUBLIC_URL}/assets/flash2.wav`);
+        explosionSound.volume = 0.5;
+        explosionSound.playbackRate = 1.4;
+        explosionSound.play().catch(e => console.error("Error playing explosion sound:", e));
 
-      // Generate particles
-      const numParticles = 50; // Increased number of particles
-      const newParticles = Array.from({ length: numParticles }).map((_, i) => ({
-        id: i,
-        x: (Math.random() - 0.5) * 2, // -1 to 1
-        y: (Math.random() - 0.5) * 2, // -1 to 1
-        size: Math.random() * 8 + 4, // Increased size range (4 to 12)
-        duration: Math.random() * 0.5 + 0.3, // 0.3 to 0.8
-        delay: Math.random() * 0.1 // 0 to 0.1
-      }));
-      setParticles(newParticles);
+        // Generate particles
+        const numParticles = 50; // Increased number of particles
+        const newParticles = Array.from({ length: numParticles }).map((_, i) => ({
+          id: i,
+          x: (Math.random() - 0.5) * 2, // -1 to 1
+          y: (Math.random() - 0.5) * 2, // -1 to 1
+          size: Math.random() * 8 + 4, // Increased size range (4 to 12)
+          duration: Math.random() * 0.5 + 0.3, // 0.3 to 0.8
+          delay: Math.random() * 0.1 // 0 to 0.1
+        }));
+        setParticles(newParticles);
+      } catch (error) {
+        console.error("Error in explosion effect:", error);
+      }
+
+      return () => {
+        if (explosionSound) {
+          explosionSound.pause();
+          explosionSound.currentTime = 0;
+        }
+      };
     }
   }, [triggerExplosion]);
 

@@ -94,3 +94,72 @@ export const validateCard = (card) => {
   if (!card.image || typeof card.image !== 'string') return false;
   return true;
 };
+
+/**
+ * Enhanced logging utility for debugging crashes and performance issues
+ */
+export const logger = {
+  log: (message, data = null) => {
+    const timestamp = new Date().toISOString();
+    const logEntry = `[${timestamp}] ${message}`;
+    if (data) {
+      console.log(logEntry, data);
+    } else {
+      console.log(logEntry);
+    }
+  },
+
+  error: (message, error = null) => {
+    const timestamp = new Date().toISOString();
+    const logEntry = `[${timestamp}] ERROR: ${message}`;
+    if (error) {
+      console.error(logEntry, error);
+    } else {
+      console.error(logEntry);
+    }
+  },
+
+  warn: (message, data = null) => {
+    const timestamp = new Date().toISOString();
+    const logEntry = `[${timestamp}] WARNING: ${message}`;
+    if (data) {
+      console.warn(logEntry, data);
+    } else {
+      console.warn(logEntry);
+    }
+  },
+
+  performance: (operation, startTime) => {
+    const duration = Date.now() - startTime;
+    const timestamp = new Date().toISOString();
+    console.log(`[${timestamp}] PERFORMANCE: ${operation} took ${duration}ms`);
+  }
+};
+
+/**
+ * Performance monitoring utility
+ */
+export const performanceMonitor = {
+  start: (operation) => {
+    const startTime = Date.now();
+    logger.log(`Starting ${operation}`);
+    return startTime;
+  },
+
+  end: (operation, startTime) => {
+    logger.performance(operation, startTime);
+  },
+
+  measure: async (operation, asyncFn) => {
+    const startTime = performanceMonitor.start(operation);
+    try {
+      const result = await asyncFn();
+      performanceMonitor.end(operation, startTime);
+      return result;
+    } catch (error) {
+      performanceMonitor.end(operation, startTime);
+      logger.error(`${operation} failed`, error);
+      throw error;
+    }
+  }
+};

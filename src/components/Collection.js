@@ -369,22 +369,24 @@ const Collection = ({ collection, showCollection, setShowCollection, getRarityCo
 
   return (
     <>
-      <Helmet>
-        <title>Your MTG Collection | Track and Manage Pulled Cards</title>
-        <meta
-          name="description"
-          content="Browse and manage your MTG card collection from opened boosters. Filter by rarity, price, type, and foil; sell duplicates to earn in-app currency."
-        />
-        <link rel="canonical" href="https://julynx.github.io/mtg_booster_simulator/collection" />
-        <meta property="og:title" content="Your MTG Collection | Track and Manage Pulled Cards" />
-        <meta property="og:description" content="Browse and manage your MTG card collection from opened boosters. Filter by rarity, price, type, and foil; sell duplicates to earn in-app currency." />
-        <meta property="og:url" content="https://julynx.github.io/mtg_booster_simulator/collection" />
-        <meta property="og:image" content="https://julynx.github.io/mtg_booster_simulator/readme_assets/homescreen.png" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Your MTG Collection | Track and Manage Pulled Cards" />
-        <meta name="twitter:description" content="Browse and manage your MTG card collection from opened boosters. Filter by rarity, price, type, and foil; sell duplicates to earn in-app currency." />
-        <meta name="twitter:image" content="https://julynx.github.io/mtg_booster_simulator/readme_assets/homescreen.png" />
-      </Helmet>
+      {showCollection && (
+        <Helmet>
+          <title>Your MTG Collection | Track and Manage Pulled Cards</title>
+          <meta
+            name="description"
+            content="Browse and manage your MTG card collection from opened boosters. Filter by rarity, price, type, and foil; sell duplicates to earn in-app currency."
+          />
+          <link rel="canonical" href="https://julynx.github.io/mtg_booster_simulator/collection" />
+          <meta property="og:title" content="Your MTG Collection | Track and Manage Pulled Cards" />
+          <meta property="og:description" content="Browse and manage your MTG card collection from opened boosters. Filter by rarity, price, type, and foil; sell duplicates to earn in-app currency." />
+          <meta property="og:url" content="https://julynx.github.io/mtg_booster_simulator/collection" />
+          <meta property="og:image" content="https://julynx.github.io/mtg_booster_simulator/readme_assets/homescreen.png" />
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content="Your MTG Collection | Track and Manage Pulled Cards" />
+          <meta name="twitter:description" content="Browse and manage your MTG card collection from opened boosters. Filter by rarity, price, type, and foil; sell duplicates to earn in-app currency." />
+          <meta name="twitter:image" content="https://julynx.github.io/mtg_booster_simulator/readme_assets/homescreen.png" />
+        </Helmet>
+      )}
       <motion.div className={styles.collectionButtonContainer} initial={{ opacity: 0, scale: 0 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.6, delay: 0.8 }}>
         <motion.button className={styles.collectionButton} whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }} onClick={toggleCollection}>
           <BookOpen size={24} />
